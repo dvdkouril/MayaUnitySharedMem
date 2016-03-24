@@ -1,0 +1,8 @@
+*.opendb
+*.sdf
+*.vcxproj
+*.filters
+*.tlog
+*.idb
+*.exp
+*.sln
