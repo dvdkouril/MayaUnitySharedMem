@@ -10,11 +10,34 @@ void* ShMemWriterNode::creator()
 
 MStatus ShMemWriterNode::compute(const MPlug& plug, MDataBlock& data) 
 {
+	if (plug != aOutput) {
+		return MS::kUnknownParameter;
+	}
+
+	float inputValue = data.inputValue(aInput).asFloat();
+	inputValue *= 2.0f;
+
+	MDataHandle hOutput = data.outputValue(aOutput);
+	hOutput.setFloat(inputValue);
+	data.setClean(plug);
+
 	return MS::kSuccess;
 }
 
 MStatus ShMemWriterNode::initialize() 
 {
+	MFnNumericAttribute nAttr;
+	
+	aOutput = nAttr.create("output", "out", MFnNumericData::kFloat);
+	nAttr.setWritable(false);
+	nAttr.setStorable(false);
+	addAttribute(aOutput);
+
+	aInput = nAttr.create("input", "in", MFnNumericData::kFloat);
+	nAttr.setKeyable(true);
+	addAttribute(aInput);
+	attributeAffects(aInput, aOutput);
+
 	return MS::kSuccess;
 }
 
