@@ -21,6 +21,18 @@ MStatus ShMemWriterNode::compute(const MPlug& plug, MDataBlock& data)
 	hOutput.setFloat(inputValue);
 	data.setClean(plug);
 
+	/* if this was the place where I could execute the writing code...
+	 - iterate over all the objects
+	 - get their positions
+	 - encode it into a string
+	CopyMemory((PVOID)pBuf, szMsg, (_tcslen(szMsg) * sizeof(TCHAR)));
+    _getch();
+
+	"the second process (unity) can then use MapViewOfFile function to obtain a pointer to the file view, pBuf.
+	The process can display this string as it would any other string."
+	*/
+
+
 	return MS::kSuccess;
 }
 
