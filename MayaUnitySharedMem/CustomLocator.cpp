@@ -5,6 +5,7 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MFnTransform.h>
 #include <maya/MVector.h>
+#include <maya/MSelectionList.h>
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -47,34 +48,88 @@ MStatus uninitializePlugin(MObject obj)
 	return status;
 }
 
+/*
+	Working draw method. Outputs just position of one cube (pCube1)
+*/
+//void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::DisplayStyle style, M3dView::DisplayStatus status)
+//{
+//	std::cout << "CustomLocator::draw" << std::endl;
+//	// use CopyMemory here
+//	MItDag itTran = MItDag(MItDag::kDepthFirst, MFn::kTransform);
+//	for (; !itTran.isDone(); itTran.next())
+//	{
+//		MObject obj = itTran.currentItem();
+//
+//		MFnDependencyNode nodeFn(obj);
+//		MString nodeName = nodeFn.name();
+//
+//		// just looking for one specific instance of cube right now
+//		if (!strcmp(nodeName.asChar(), "pCube1")) {
+//			
+//			MFnTransform fn(obj);
+//			MVector translation = fn.getTranslation(MSpace::kObject);
+//
+//			std::ostringstream os;
+//			os << translation.x << " " << translation.y << " " << translation.z << std::endl;
+//			std::string s = os.str();
+//
+//			const char *msg = s.c_str();
+//			CopyMemory((PVOID)pBuf, msg, (_tcslen(msg) * sizeof(TCHAR)));
+//		}
+//	}
+//
+//	// this is unnecessary (I hope)
+//	view.beginGL();
+//	view.endGL();
+//}
+
+// don't fucking forget to change this!!!
 void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::DisplayStyle style, M3dView::DisplayStatus status)
 {
-	std::cout << "CustomLocator::draw" << std::endl;
-	// use CopyMemory here
+	// "binary" writing
+
+	/* steps:
+	- go through scene, get selection list
+	- get number of object to output
+	- make an array of that size * 3 * 4 (3 floats - positions)
+	- fill array by going through selection list
+	- CopyMemory (in chunk, outside of the iteration loop)
+	*/
+	MSelectionList sl;
+
+	// this loop just filters the scene and add objects I want to output into a selection list
+	// I need to do this because I need to get number of objects so that I can allocate (local) array of that size
+	// new, malloc is expensive
 	MItDag itTran = MItDag(MItDag::kDepthFirst, MFn::kTransform);
 	for (; !itTran.isDone(); itTran.next())
 	{
 		MObject obj = itTran.currentItem();
-
+		// get the name of the object
 		MFnDependencyNode nodeFn(obj);
 		MString nodeName = nodeFn.name();
 
-		if (!strcmp(nodeName.asChar(), "pCube1")) {
-			
-			MFnTransform fn(obj);
-			MVector translation = fn.getTranslation(MSpace::kObject);
-
-			std::ostringstream os;
-			os << translation.x << " " << translation.y << " " << translation.z << std::endl;
-			std::string s = os.str();
-
-			const char *msg = s.c_str();
-			CopyMemory((PVOID)pBuf, msg, (_tcslen(msg) * sizeof(TCHAR)));
+		// filter out object I don't want to output
+		if (strstr(nodeName.asChar(), "pCube") != NULL)
+		{
+			sl.add(obj); // add it into selection list
 		}
 	}
 
-	view.beginGL();
-	view.endGL();
+	//float output[sl.length()]; // oh yeah, I forgot can't do this
+
+	for (int i = 0; i < sl.length(); ++i)
+	{
+		MObject obj;
+		sl.getDependNode(i, obj);
+		MFnTransform fn(obj);
+		MVector translation = fn.getTranslation(MSpace::kObject);
+	}
+	MFnTransform fn(obj);
+	MVector translation = fn.getTranslation(MSpace::kObject);
+	float pos[3] = { translation.x, translation.y, translation.z };
+
+	CopyMemory((PVOID)pBuf, msg, (_tcslen(msg) * sizeof(float))); // actually this should be 
+	
 }
 
 bool CustomLocator::isBounded() const
