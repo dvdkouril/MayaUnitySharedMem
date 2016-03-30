@@ -9,6 +9,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <vector>
 
 #define BUF_SIZE 256
 
@@ -83,7 +84,10 @@ MStatus uninitializePlugin(MObject obj)
 //	view.endGL();
 //}
 
-// don't fucking forget to change this!!!
+/*
+	"Experimental" version of shared memory writing function
+	TODO: DEBUG THIS!!! LIKE STEP THROUGH IT WITH DEBUGGER!!!
+*/
 void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::DisplayStyle style, M3dView::DisplayStatus status)
 {
 	// "binary" writing
@@ -95,11 +99,8 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 	- fill array by going through selection list
 	- CopyMemory (in chunk, outside of the iteration loop)
 	*/
-	MSelectionList sl;
+	std::vector<double> memOutputArray;
 
-	// this loop just filters the scene and add objects I want to output into a selection list
-	// I need to do this because I need to get number of objects so that I can allocate (local) array of that size
-	// new, malloc is expensive
 	MItDag itTran = MItDag(MItDag::kDepthFirst, MFn::kTransform);
 	for (; !itTran.isDone(); itTran.next())
 	{
@@ -111,24 +112,18 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 		// filter out object I don't want to output
 		if (strstr(nodeName.asChar(), "pCube") != NULL)
 		{
-			sl.add(obj); // add it into selection list
+			MFnTransform fn(obj);
+			MVector translation = fn.getTranslation(MSpace::kObject);
+			memOutputArray.push_back(translation.x);
+			memOutputArray.push_back(translation.y);
+			memOutputArray.push_back(translation.z);
 		}
 	}
 
-	//float output[sl.length()]; // oh yeah, I forgot can't do this
+	size_t objNum = memOutputArray.size();
+	double * memOutPtr = &memOutputArray[0]; // people say you can do this
 
-	for (int i = 0; i < sl.length(); ++i)
-	{
-		MObject obj;
-		sl.getDependNode(i, obj);
-		MFnTransform fn(obj);
-		MVector translation = fn.getTranslation(MSpace::kObject);
-	}
-	MFnTransform fn(obj);
-	MVector translation = fn.getTranslation(MSpace::kObject);
-	float pos[3] = { translation.x, translation.y, translation.z };
-
-	CopyMemory((PVOID)pBuf, msg, (_tcslen(msg) * sizeof(float))); // actually this should be 
+	CopyMemory((PVOID)pBuf, memOutPtr, (objNum * sizeof(double)));
 	
 }
 
