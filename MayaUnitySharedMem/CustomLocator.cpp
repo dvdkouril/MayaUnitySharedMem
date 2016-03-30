@@ -99,7 +99,7 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 	- fill array by going through selection list
 	- CopyMemory (in chunk, outside of the iteration loop)
 	*/
-	std::vector<double> memOutputArray;
+	std::vector<float> memOutputArray;
 
 	MItDag itTran = MItDag(MItDag::kDepthFirst, MFn::kTransform);
 	for (; !itTran.isDone(); itTran.next())
@@ -114,16 +114,16 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 		{
 			MFnTransform fn(obj);
 			MVector translation = fn.getTranslation(MSpace::kObject);
-			memOutputArray.push_back(translation.x);
-			memOutputArray.push_back(translation.y);
-			memOutputArray.push_back(translation.z);
+			memOutputArray.push_back((float)translation.x);
+			memOutputArray.push_back((float)translation.y);
+			memOutputArray.push_back((float)translation.z);
 		}
 	}
 
 	size_t objNum = memOutputArray.size();
-	double * memOutPtr = &memOutputArray[0]; // people say you can do this
+	float * memOutPtr = &memOutputArray[0]; // people say you can do this
 
-	CopyMemory((PVOID)pBuf, memOutPtr, (objNum * sizeof(double)));
+	CopyMemory((PVOID)pBuf, memOutPtr, (objNum * sizeof(float)));
 	
 }
 
