@@ -5,7 +5,10 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MFnTransform.h>
 #include <maya/MVector.h>
+#include <maya/MQuaternion.h>
+#include <maya/MEulerRotation.h>
 #include <maya/MSelectionList.h>
+#include <maya/MDagPath.h>
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -112,11 +115,25 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 		// filter out object I don't want to output
 		if (strstr(nodeName.asChar(), "pCube") != NULL)
 		{
-			MFnTransform fn(obj);
-			MVector translation = fn.getTranslation(MSpace::kObject);
+			MDagPath dagPath;
+			MDagPath::getAPathTo(obj, dagPath);
+			MFnTransform fn(dagPath);
+			//MFnTransform fn(obj);
+			//MVector translation = fn.getTranslation(MSpace::kObject);
+			MVector translation = fn.getTranslation(MSpace::kWorld);
 			memOutputArray.push_back((float)translation.x);
 			memOutputArray.push_back((float)translation.y);
 			memOutputArray.push_back((float)translation.z);
+
+			MQuaternion rot(0, 0, 0, 1);
+			fn.getRotation(rot, MSpace::kTransform);
+			MEulerRotation rotAng;
+			fn.getRotation(rotAng);
+			//fn.getRotation(rot, MSpace::kWorld);
+			memOutputArray.push_back((float)rot.x);
+			memOutputArray.push_back((float)rot.y);
+			memOutputArray.push_back((float)rot.z);
+			memOutputArray.push_back((float)rot.w);
 		}
 	}
 
