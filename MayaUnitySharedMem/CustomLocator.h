@@ -26,12 +26,18 @@ public:
 	static const MTypeId typeId;
 	static const MString typeName;
 private:
-	//TCHAR szName[] = TEXT("bla");
-	//TCHAR * szName; // I don't really need to bother with this
+	HANDLE hCamInfoShMem;
 	HANDLE hMapFile;
+	HANDLE hSceneInfoShMem;
+	/*LPCTSTR pCamInfo;
 	LPCTSTR pBuf;
+	LPCTSTR pSceneInfo;*/
+	LPVOID pCamInfo;
+	LPVOID pBuf;
+	LPVOID pSceneInfo;
 	bool initSharedMemory();
 	void freeSharedMemory();
+	static MQuaternion rotationMayaToUnity(MQuaternion q);
 };
 
 const MTypeId CustomLocator::typeId(0x70000);
