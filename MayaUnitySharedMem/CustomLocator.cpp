@@ -13,6 +13,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <stdexcept>
 #include <vector>
 
 #include "startStreamingCommand.h"
@@ -20,84 +21,11 @@
 
 #define BUF_SIZE 256
 
-// ------------------------------------------------------------------------------------- MAYA PLUGIN REQUIRED FUNCTIONS
-// it might be better to move this somewhere else, but for now...
-
-MStatus initializePlugin(MObject obj)
-{
-	MFnPlugin plugin(obj, "David Kouril", "1.0", "Any");
-
-	MStatus status = plugin.registerNode(CustomLocator::typeName,
-		CustomLocator::typeId,
-		CustomLocator::creator,
-		CustomLocator::initialize,
-		MPxNode::kLocatorNode); // is this why it didn't work before????????? yep, looks like it
-
-	// register startStreamingCommand command
-	status = plugin.registerCommand("startM2CVStreaming", startStreamingCommand::creator);
-	status = plugin.registerCommand("endM2CVStreaming", endStreamingCommand::creator);
-
-	// TODO: add a custom menu with items: Start streaming, Stop streaming
-	// yeah it looks like it works
-	MGlobal::executeCommand("global string $gMainWindow");
-	MGlobal::executeCommand("setParent $gMainWindow");
-	MGlobal::executeCommand("menu -label \"MayaToCellVIEW\" mayaToCelViewMenu");
-
-	MGlobal::executeCommand("setParent -menu mayaToCelViewMenu");
-	MGlobal::executeCommand("menuItem -label \"Start Streaming\" -command \"startM2CVStreaming\" startStreamingItem");
-	MGlobal::executeCommand("menuItem -label \"End Streaming\" -command \"endM2CVStreaming\" -enable false endStreamingItem");
-
-	if (!status)
-	{
-		status.perror("Failed to register customLocator\n");
-		return status;
-	}
-
-	std::cout << "initializePlugin successful." << std::endl;
-	
-	return status;
-}
-
-MStatus uninitializePlugin(MObject obj)
-{
-	MFnPlugin plugin(obj);
-
-	// TODO: delete custom menu
-	MStatus status = plugin.deregisterNode(CustomLocator::typeId);
-	status = plugin.deregisterCommand("startM2CVStreaming");
-	status = plugin.deregisterCommand("endM2CVStreaming");
-
-	MGlobal::executeCommand("global string $gMainWindow");
-	MGlobal::executeCommand("setParent $gMainWindow");
-	MGlobal::executeCommand("deleteUI \"mayaToCelViewMenu\""); // finally this works
-
-	if (!status)
-	{
-		status.perror("Failed to deregister customLocator\n");
-		return status;
-	}
-
-	std::cout << "uninitializePlugin successful." << std::endl;
-	return status;
-}
-
 /*
-	My utility function, probably shouldn't be here...
+	Most important method of this class.
+	Parses the scene looking for protein objects and outputs their positions, rotations and information about type int shared memory for Unity to read.
+	Exploits MPxLocatorNode's draw method because it's the only class in Maya API (that I know of) that gets called everytime something changes in the viewport.
 */
-MQuaternion CustomLocator::rotationMayaToUnity(MQuaternion q)
-{
-	MEulerRotation rotAng;
-	rotAng = q.asEulerRotation();
-	rotAng.x = -rotAng.x;
-	rotAng.y = -rotAng.y;
-	MEulerRotation reordered = rotAng.reorder(MEulerRotation::kZXY);
-	MQuaternion res = reordered.asQuaternion();
-
-	return res;
-}
-
-// ------------------------------------------------------------------------------------- MAYA PLUGIN REQUIRED FUNCTIONS end
-
 void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::DisplayStyle style, M3dView::DisplayStatus status)
 {
 	std::vector<float> posMemOutArray; // array for positions (3 consecutive floats are single object's position)
@@ -105,9 +33,9 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 	std::vector<float> idMemOutArray; // I will see what the format of this will be... TODO, I am not using or outputting this right now
 	std::vector<float> cameraParams;  // position (3 floats) | rotation (4 floats) | ?
 
-	// MAYBE TODO: don't go over the whole scene but keep this information somewhere and update it when it changes.
-	// The thing is that this actually gets called only when the viewport has changed (objects or camera)
-	// so it's maybe already fine...
+									  // MAYBE TODO: don't go over the whole scene but keep this information somewhere and update it when it changes.
+									  // The thing is that this actually gets called only when the viewport has changed (objects or camera)
+									  // so it's maybe already fine...
 	int numberOfObjects = 0;
 	MItDag itTran = MItDag(MItDag::kDepthFirst, MFn::kTransform);
 	for (; !itTran.isDone(); itTran.next())
@@ -154,17 +82,13 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 
 			MQuaternion rot(0, 0, 0, 1);
 			fn.getRotation(rot, MSpace::kTransform);
-			// TODO: Quaternion right-hand to left-hand conversion
+			// Quaternion right-hand to left-hand conversion
 			MQuaternion res = CustomLocator::rotationMayaToUnity(rot);
-			// ----
+
 			rotMemOutArray.push_back((float)res.x);
 			rotMemOutArray.push_back((float)res.y);
 			rotMemOutArray.push_back((float)res.z);
 			rotMemOutArray.push_back((float)res.w);
-			/*rotMemOutArray.push_back((float)rot.x);
-			rotMemOutArray.push_back((float)rot.y);
-			rotMemOutArray.push_back((float)rot.z);
-			rotMemOutArray.push_back((float)rot.w);*/
 			numberOfObjects += 1;
 		}
 	}
@@ -185,9 +109,77 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 	// scene info
 	CopyMemory(pSceneInfo, &numberOfObjects, sizeof(int));
 
+}
 
-	// I have to figure out how to transfer the information about number of objects
-	// because as of now, I don't know where in the shared memory the positions end and rotations begin
+// ------------------------------------------------------------------------------------- MAYA PLUGIN REQUIRED FUNCTIONS
+// it might be better to move this somewhere else, but for now...
+
+MStatus initializePlugin(MObject obj)
+{
+	MFnPlugin plugin(obj, "David Kouril", "1.0", "Any");
+
+	MStatus status = plugin.registerNode(CustomLocator::typeName,
+		CustomLocator::typeId,
+		CustomLocator::creator,
+		CustomLocator::initialize,
+		MPxNode::kLocatorNode); // is this why it didn't work before????????? yep, looks like it
+
+	// register startStreamingCommand command
+	status = plugin.registerCommand("startM2CVStreaming", startStreamingCommand::creator);
+	status = plugin.registerCommand("endM2CVStreaming", endStreamingCommand::creator);
+
+	// add a custom menu with items: Start streaming, Stop streaming
+	MGlobal::executeCommand("global string $gMainWindow");
+	MGlobal::executeCommand("setParent $gMainWindow");
+	MGlobal::executeCommand("menu -label \"MayaToCellVIEW\" mayaToCelViewMenu");
+
+	MGlobal::executeCommand("setParent -menu mayaToCelViewMenu");
+	MGlobal::executeCommand("menuItem -label \"Start Streaming\" -command \"startM2CVStreaming\" startStreamingItem");
+	MGlobal::executeCommand("menuItem -label \"End Streaming\" -command \"endM2CVStreaming\" -enable false endStreamingItem");
+
+	if (!status)
+	{
+		status.perror("Failed to register customLocator\n");
+		return status;
+	}
+
+	std::cout << "initializePlugin successful." << std::endl;
+	
+	return status;
+}
+
+MStatus uninitializePlugin(MObject obj)
+{
+	MFnPlugin plugin(obj);
+
+	// TODO: delete custom menu
+	MStatus status = plugin.deregisterNode(CustomLocator::typeId);
+	status = plugin.deregisterCommand("startM2CVStreaming");
+	status = plugin.deregisterCommand("endM2CVStreaming");
+
+	MGlobal::executeCommand("global string $gMainWindow");
+	MGlobal::executeCommand("setParent $gMainWindow");
+	MGlobal::executeCommand("deleteUI \"mayaToCelViewMenu\""); // finally this works
+
+	if (!status)
+	{
+		status.perror("Failed to deregister customLocator\n");
+		return status;
+	}
+
+	std::cout << "uninitializePlugin successful." << std::endl;
+	return status;
+}
+
+// ------------------------------------------------------------------------------------- MAYA PLUGIN REQUIRED FUNCTIONS end
+
+CustomLocator::CustomLocator() : MPxLocatorNode()
+{
+	if (!initSharedMemory())
+	{ // if allocation of shared memory fails...
+		//MGlobal::executeCommand("endM2CVStreaming"); // ... don't allow to stream
+		throw std::bad_alloc();
+	}
 }
 
 bool CustomLocator::isBounded() const
@@ -210,9 +202,20 @@ MBoundingBox CustomLocator::boundingBox() const
 
 void * CustomLocator::creator()
 {
-	return new CustomLocator;
+	try
+	{
+		return new CustomLocator; // CustomLocator constructor might throw an exception if shared memory allocation fails...
+	} catch (const std::exception& error)
+	{
+		return nullptr;
+	}
+	//return new CustomLocator;
+	//return nullptr; // testing
 }
 
+/*
+	This function is called after loading of the plugin.
+*/
 MStatus CustomLocator::initialize()
 {
 	std::cout << "CustomLocator::initialize" << std::endl;
@@ -222,6 +225,8 @@ MStatus CustomLocator::initialize()
 // ==================================================== Shared Memory related functions
 /*
 	TODO: 
+			- figure out what size of memory to allocate (now it's BUF_SIZE for all of them)
+			DONE:
 			- Better error handling
 */
 bool CustomLocator::initSharedMemory() 
@@ -232,8 +237,6 @@ bool CustomLocator::initSharedMemory()
 
 	if (hSceneInfoShMem == NULL)
 	{
-		DWORD err = GetLastError();
-		_tprintf(TEXT("Could not create file mapping object: (%d)\n"), err);
 		return false;
 	}
 
@@ -241,8 +244,6 @@ bool CustomLocator::initSharedMemory()
 
 	if (pSceneInfo == NULL)
 	{
-		DWORD err = GetLastError();
-		_tprintf(TEXT("Could not map view of file (%d) \n"), err);
 		CloseHandle(hSceneInfoShMem);
 		return false;
 	}
@@ -253,8 +254,6 @@ bool CustomLocator::initSharedMemory()
 
 	if (hCamInfoShMem == NULL)
 	{
-		DWORD err = GetLastError();
-		_tprintf(TEXT("Could not create file mapping object: (%d)\n"), err);
 		return false;
 	}
 
@@ -262,8 +261,6 @@ bool CustomLocator::initSharedMemory()
 
 	if (pCamInfo == NULL)
 	{
-		DWORD err = GetLastError();
-		_tprintf(TEXT("Could not map view of file (%d) \n"), err);
 		CloseHandle(hCamInfoShMem);
 		return false;
 	}
@@ -275,8 +272,6 @@ bool CustomLocator::initSharedMemory()
 
 	if (hMapFile == NULL)
 	{
-		DWORD err = GetLastError();
-		_tprintf(TEXT("Could not create file mapping object: (%d)\n"), err);
 		return false;
 	}
 
@@ -284,13 +279,12 @@ bool CustomLocator::initSharedMemory()
 
 	if (pBuf == NULL)
 	{
-		DWORD err = GetLastError();
-		_tprintf(TEXT("Could not map view of file (%d) \n"), err);
 		CloseHandle(hMapFile);
 		return false;
 	}
 
 	return true;
+	//return false; // testing purposes
 
 }
 
@@ -305,4 +299,19 @@ void CustomLocator::freeSharedMemory()
 
 	UnmapViewOfFile(this->pSceneInfo);
 	CloseHandle(this->hSceneInfoShMem);
+}
+
+/*
+My utility function, probably shouldn't be here...
+*/
+MQuaternion CustomLocator::rotationMayaToUnity(MQuaternion q)
+{
+	MEulerRotation rotAng;
+	rotAng = q.asEulerRotation();
+	rotAng.x = -rotAng.x;
+	rotAng.y = -rotAng.y;
+	MEulerRotation reordered = rotAng.reorder(MEulerRotation::kZXY);
+	MQuaternion res = reordered.asQuaternion();
+
+	return res;
 }

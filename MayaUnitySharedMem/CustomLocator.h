@@ -13,13 +13,15 @@
 class CustomLocator : MPxLocatorNode 
 {
 public:
-	CustomLocator() : MPxLocatorNode() { initSharedMemory(); }
+	//CustomLocator() : MPxLocatorNode() { initSharedMemory(); }
+	CustomLocator();
 	virtual ~CustomLocator() { freeSharedMemory();  }
 
 	virtual void			draw(M3dView & view, const MDagPath & path, M3dView::DisplayStyle style, M3dView::DisplayStatus status);
 	virtual bool            isBounded() const;
 	virtual MBoundingBox	boundingBox() const;
 
+	// these two are not actually inherited functions, they could be named any other way because you specify them when calling MFnPlugin::registerNode (at least I think...)
 	static  MStatus         initialize();
 	static  void *          creator();
 
@@ -29,9 +31,6 @@ private:
 	HANDLE hCamInfoShMem;
 	HANDLE hMapFile;
 	HANDLE hSceneInfoShMem;
-	/*LPCTSTR pCamInfo;
-	LPCTSTR pBuf;
-	LPCTSTR pSceneInfo;*/
 	LPVOID pCamInfo;
 	LPVOID pBuf;
 	LPVOID pSceneInfo;
