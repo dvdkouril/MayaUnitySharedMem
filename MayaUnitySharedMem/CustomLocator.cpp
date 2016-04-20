@@ -67,10 +67,11 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 			cameraParams.push_back((float)res.w);
 		}
 
-		// filter out object I don't want to output
-		// TODO: design how will I parse the scene
-		if (strstr(nodeName.asChar(), "pCube") != NULL) // this filtering of objects might be slow...
+		if (strstr(nodeName.asChar(), "pdbMolStruc_2RCJ") != NULL)
 		{
+			/*
+			TODO: Parsing the PDB id from the name of the node and according to some hash table get an id of protein type that will be outputed
+			*/
 			MDagPath dagPath;
 			MDagPath::getAPathTo(obj, dagPath);
 			MFnTransform fn(dagPath);
@@ -91,12 +92,43 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 			rotMemOutArray.push_back((float)res.w);
 			numberOfObjects += 1;
 		}
+		//// filter out object I don't want to output
+		//// TODO: design how will I parse the scene
+		//if (strstr(nodeName.asChar(), "pCube") != NULL) // this filtering of objects might be slow...
+		//{
+		//	MDagPath dagPath;
+		//	MDagPath::getAPathTo(obj, dagPath);
+		//	MFnTransform fn(dagPath);
+		//	MVector translation = fn.getTranslation(MSpace::kWorld);
+		//	posMemOutArray.push_back((float)translation.x);
+		//	posMemOutArray.push_back((float)translation.y);
+		//	posMemOutArray.push_back((float)-translation.z); // inverted for Unity
+		//	posMemOutArray.push_back((float)0); // 4th position coordinate for whatever reason
+
+		//	MQuaternion rot(0, 0, 0, 1);
+		//	fn.getRotation(rot, MSpace::kTransform);
+		//	// Quaternion right-hand to left-hand conversion
+		//	MQuaternion res = CustomLocator::rotationMayaToUnity(rot);
+
+		//	rotMemOutArray.push_back((float)res.x);
+		//	rotMemOutArray.push_back((float)res.y);
+		//	rotMemOutArray.push_back((float)res.z);
+		//	rotMemOutArray.push_back((float)res.w);
+		//	numberOfObjects += 1;
+		//}
 	}
+
 	size_t posArraySize = posMemOutArray.size();
 	size_t rotArraySize = rotMemOutArray.size();
+	size_t camInfoArraySize = cameraParams.size();
+
+	if ((posArraySize <= 0) || (rotArraySize <= 0) || (camInfoArraySize <= 0))
+	{
+		return;
+	}
+
 	float * posMemOutPtr = &posMemOutArray[0]; // people say you can do this
 	float * rotMemOutPtr = &rotMemOutArray[0]; // pointer arithmetics
-	size_t camInfoArraySize = cameraParams.size();
 	float * camInfoPtr = &cameraParams[0];
 
 	CopyMemory(pBuf, posMemOutPtr, (posArraySize * sizeof(float)));
@@ -111,86 +143,42 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 
 }
 
-// ------------------------------------------------------------------------------------- MAYA PLUGIN REQUIRED FUNCTIONS
-// it might be better to move this somewhere else, but for now...
 
-MStatus initializePlugin(MObject obj)
-{
-	MFnPlugin plugin(obj, "David Kouril", "1.0", "Any");
-
-	MStatus status = plugin.registerNode(CustomLocator::typeName,
-		CustomLocator::typeId,
-		CustomLocator::creator,
-		CustomLocator::initialize,
-		MPxNode::kLocatorNode); // is this why it didn't work before????????? yep, looks like it
-
-	// register startStreamingCommand command
-	status = plugin.registerCommand("startM2CVStreaming", startStreamingCommand::creator);
-	status = plugin.registerCommand("endM2CVStreaming", endStreamingCommand::creator);
-
-	// add a custom menu with items: Start streaming, Stop streaming
-	MGlobal::executeCommand("global string $gMainWindow");
-	MGlobal::executeCommand("setParent $gMainWindow");
-	MGlobal::executeCommand("menu -label \"MayaToCellVIEW\" mayaToCelViewMenu");
-
-	MGlobal::executeCommand("setParent -menu mayaToCelViewMenu");
-	MGlobal::executeCommand("menuItem -label \"Start Streaming\" -command \"startM2CVStreaming\" startStreamingItem");
-	MGlobal::executeCommand("menuItem -label \"End Streaming\" -command \"endM2CVStreaming\" -enable false endStreamingItem");
-
-	if (!status)
-	{
-		status.perror("Failed to register customLocator\n");
-		return status;
-	}
-
-	std::cout << "initializePlugin successful." << std::endl;
-	
-	return status;
-}
-
-MStatus uninitializePlugin(MObject obj)
-{
-	MFnPlugin plugin(obj);
-
-	// TODO: delete custom menu
-	MStatus status = plugin.deregisterNode(CustomLocator::typeId);
-	status = plugin.deregisterCommand("startM2CVStreaming");
-	status = plugin.deregisterCommand("endM2CVStreaming");
-
-	MGlobal::executeCommand("global string $gMainWindow");
-	MGlobal::executeCommand("setParent $gMainWindow");
-	MGlobal::executeCommand("deleteUI \"mayaToCelViewMenu\""); // finally this works
-
-	if (!status)
-	{
-		status.perror("Failed to deregister customLocator\n");
-		return status;
-	}
-
-	std::cout << "uninitializePlugin successful." << std::endl;
-	return status;
-}
-
-// ------------------------------------------------------------------------------------- MAYA PLUGIN REQUIRED FUNCTIONS end
 
 CustomLocator::CustomLocator() : MPxLocatorNode()
 {
-	if (!initSharedMemory())
+	// iterating through the scene to see for how many objects do I need to allocate memory
+	int numberOfObjects = 0;
+	MItDag itTran = MItDag(MItDag::kDepthFirst, MFn::kTransform);
+	for (; !itTran.isDone(); itTran.next())
+	{
+		MObject obj = itTran.currentItem();
+		// get the name of the object
+		MFnDependencyNode nodeFn(obj);
+		MString nodeName = nodeFn.name();
+
+		if (strstr(nodeName.asChar(), "pdbMolStruc_2RCJ") != NULL)
+		{
+			numberOfObjects += 1;
+		}
+	}
+
+	if (!initSharedMemory(numberOfObjects))
 	{ // if allocation of shared memory fails...
-		//MGlobal::executeCommand("endM2CVStreaming"); // ... don't allow to stream
 		throw std::bad_alloc();
 	}
 }
 
 bool CustomLocator::isBounded() const
 {
-	return true;
+	return true; // by returning false I think this should make it to call the draw without culling it ever
+	//return true;
 }
 
 MBoundingBox CustomLocator::boundingBox() const
 {
 	MBoundingBox bbox;
-	// simply expand the bounding box to contain the points used
+	// just some random bounding box
 	bbox.expand(MPoint(-0.5f, 0.0f, -0.5f));
 	bbox.expand(MPoint(0.5f, 0.0f, -0.5f));
 	bbox.expand(MPoint(0.5f, 0.0f, 0.5f));
@@ -229,7 +217,8 @@ MStatus CustomLocator::initialize()
 			DONE:
 			- Better error handling
 */
-bool CustomLocator::initSharedMemory() 
+//bool CustomLocator::initSharedMemory() 
+bool CustomLocator::initSharedMemory(size_t numberOfObjs) 
 {
 	// ------------------------------------------------------ scene info shared memory initialization
 	TCHAR sceneInfoShMemName[] = TEXT("MayaToUnitySceneInfoSharedMem");
@@ -268,6 +257,7 @@ bool CustomLocator::initSharedMemory()
 	// ------------------------------------------------------ main shared memory initialization
 	std::cout << "initSharedMemory()" << std::endl;
 	TCHAR szName[] = TEXT("MyFileMappingObject");
+	//hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,	BUF_SIZE, szName);
 	hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,	BUF_SIZE, szName);
 
 	if (hMapFile == NULL)
@@ -315,3 +305,67 @@ MQuaternion CustomLocator::rotationMayaToUnity(MQuaternion q)
 
 	return res;
 }
+
+// ------------------------------------------------------------------------------------- 
+// MAYA PLUGIN REQUIRED FUNCTIONS
+// ------------------------------------------------------------------------------------- 
+// it might be better to move this somewhere else, but for now...
+
+MStatus initializePlugin(MObject obj)
+{
+	MFnPlugin plugin(obj, "David Kouril", "1.0", "Any");
+
+	MStatus status = plugin.registerNode(CustomLocator::typeName,
+		CustomLocator::typeId,
+		CustomLocator::creator,
+		CustomLocator::initialize,
+		MPxNode::kLocatorNode); // is this why it didn't work before????????? yep, looks like it
+
+								// register startStreamingCommand command
+	status = plugin.registerCommand("startM2CVStreaming", startStreamingCommand::creator);
+	status = plugin.registerCommand("endM2CVStreaming", endStreamingCommand::creator);
+
+	// add a custom menu with items: Start streaming, Stop streaming
+	MGlobal::executeCommand("global string $gMainWindow");
+	MGlobal::executeCommand("setParent $gMainWindow");
+	MGlobal::executeCommand("menu -label \"MayaToCellVIEW\" mayaToCelViewMenu");
+
+	MGlobal::executeCommand("setParent -menu mayaToCelViewMenu");
+	MGlobal::executeCommand("menuItem -label \"Start Streaming\" -command \"startM2CVStreaming\" startStreamingItem");
+	MGlobal::executeCommand("menuItem -label \"End Streaming\" -command \"endM2CVStreaming\" -enable false endStreamingItem");
+
+	if (!status)
+	{
+		status.perror("Failed to register customLocator\n");
+		return status;
+	}
+
+	std::cout << "initializePlugin successful." << std::endl;
+
+	return status;
+}
+
+MStatus uninitializePlugin(MObject obj)
+{
+	MFnPlugin plugin(obj);
+
+	// TODO: delete custom menu
+	MStatus status = plugin.deregisterNode(CustomLocator::typeId);
+	status = plugin.deregisterCommand("startM2CVStreaming");
+	status = plugin.deregisterCommand("endM2CVStreaming");
+
+	MGlobal::executeCommand("global string $gMainWindow");
+	MGlobal::executeCommand("setParent $gMainWindow");
+	MGlobal::executeCommand("deleteUI \"mayaToCelViewMenu\""); // finally this works
+
+	if (!status)
+	{
+		status.perror("Failed to deregister customLocator\n");
+		return status;
+	}
+
+	std::cout << "uninitializePlugin successful." << std::endl;
+	return status;
+}
+
+// ------------------------------------------------------------------------------------- MAYA PLUGIN REQUIRED FUNCTIONS end

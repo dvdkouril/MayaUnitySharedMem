@@ -34,7 +34,8 @@ private:
 	LPVOID pCamInfo;
 	LPVOID pBuf;
 	LPVOID pSceneInfo;
-	bool initSharedMemory();
+	//bool initSharedMemory();
+	bool initSharedMemory(size_t numberOfObjs);
 	void freeSharedMemory();
 	static MQuaternion rotationMayaToUnity(MQuaternion q);
 };
