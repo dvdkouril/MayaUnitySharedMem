@@ -12,6 +12,8 @@ public:
 
 	virtual MStatus doIt(const MArgList&)
 	{
+
+		std::cout << "Stopping to stream to Unity..." << std::endl;
 		/* TODO: MEL commands via MGlobal::executeCommand()
 		- delete customLocator from the scene
 		- enable 'Start Streaming' menu item
@@ -24,6 +26,8 @@ public:
 
 		MGlobal::executeCommand("menuItem -edit -enable true startStreamingItem");
 		MGlobal::executeCommand("menuItem -edit -enable false endStreamingItem");
+
+		//while (true) { int a = 0; a++; }
 
 		return MS::kSuccess;
 	}

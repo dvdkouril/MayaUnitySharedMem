@@ -14,6 +14,7 @@ public:
 
 	virtual MStatus doIt(const MArgList&) 
 	{
+		std::cout << "Starting to stream to Unity..." << std::endl;
 		/* TODO: MEL commands via MGlobal::executeCommand()
 		- add customLocator into the scene
 		- disable 'Start Streaming' menu item
