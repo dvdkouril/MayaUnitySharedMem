@@ -158,13 +158,7 @@ CustomLocator::CustomLocator() : MPxLocatorNode()
 {
 	nextFreeInternalId = 0;
 	debugOut.open("C:\\Users\\dvdkouril\\Documents\\Visual Studio 2015\\Projects\\MayaUnitySharedMem\\output.txt");
-	pdbIdsFile.open("C:\\Users\\dvdkouril\\Documents\\Visual Studio 2015\\Projects\\MayaUnitySharedMem\\pdbIdsFile.txt");
 
-	if (!pdbIdsFile.is_open())
-	{
-		std::cerr << "There was a problem while opening pdbIdsFile.txt" << std::endl;
-		throw std::bad_alloc();
-	}
 
 	// iterating through the scene to see for how many objects do I need to allocate memory
 	// ... and also some other things
@@ -195,12 +189,6 @@ CustomLocator::CustomLocator() : MPxLocatorNode()
 		}
 	}
 
-	// put the info about 'pdbId -> internal id' link into a file that unity will read
-	/*for (std::map<std::string, int>::iterator it = pdbIdMap.begin(); it != pdbIdMap.end(); ++it)
-	{
-		pdbIdsFile << it->first << " " << it->second << std::endl;
-	}
-	pdbIdsFile.close();*/
 	std::stringstream ss;
 	for (std::map<std::string, int>::iterator it = pdbIdMap.begin(); it != pdbIdMap.end(); ++it)
 	{
