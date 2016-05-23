@@ -15,7 +15,6 @@
 class CustomLocator : MPxLocatorNode 
 {
 public:
-	//CustomLocator() : MPxLocatorNode() { initSharedMemory(); }
 	CustomLocator();
 	virtual ~CustomLocator() { freeSharedMemory(); debugOut.close(); }
 
@@ -29,6 +28,7 @@ public:
 
 	static const MTypeId typeId;
 	static const MString typeName;
+
 private:
 	HANDLE hCamInfoShMem;
 	HANDLE hMapFile;
@@ -52,6 +52,3 @@ private:
 	// debug output
 	std::ofstream debugOut;
 };
-
-const MTypeId CustomLocator::typeId(0x70000);
-const MString CustomLocator::typeName("customLocator");

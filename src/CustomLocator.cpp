@@ -1,5 +1,4 @@
 #include "CustomLocator.h"
-#include <maya/MFnPlugin.h>
 
 #include <maya/MItDag.h>
 #include <maya/MFnDependencyNode.h>
@@ -17,9 +16,6 @@
 #include <vector>
 #include <algorithm>
 
-#include "startStreamingCommand.h"
-#include "endStreamingCommand.h"
-
 #define BUF_SIZE 256
 
 double PCFreq = 0.0;
@@ -29,6 +25,9 @@ __int64 CounterStart = 0;
 // outputs number of ms
 void StartCounter();
 double GetCounter();
+
+const MTypeId CustomLocator::typeId(0x70000);
+const MString CustomLocator::typeName("customLocator");
 
 /*
 	Most important method of this class.
@@ -450,67 +449,3 @@ double GetCounter()
 	QueryPerformanceCounter(&li);
 	return double(li.QuadPart - CounterStart) / PCFreq;
 }
-
-// ------------------------------------------------------------------------------------- 
-// MAYA PLUGIN REQUIRED FUNCTIONS
-// ------------------------------------------------------------------------------------- 
-// it might be better to move this somewhere else, but for now...
-
-MStatus initializePlugin(MObject obj)
-{
-	MFnPlugin plugin(obj, "David Kouril", "1.0", "Any");
-
-	MStatus status = plugin.registerNode(CustomLocator::typeName,
-		CustomLocator::typeId,
-		CustomLocator::creator,
-		CustomLocator::initialize,
-		MPxNode::kLocatorNode); // is this why it didn't work before????????? yep, looks like it
-
-								// register startStreamingCommand command
-	status = plugin.registerCommand("startM2CVStreaming", startStreamingCommand::creator);
-	status = plugin.registerCommand("endM2CVStreaming", endStreamingCommand::creator);
-
-	// add a custom menu with items: Start streaming, Stop streaming
-	MGlobal::executeCommand("global string $gMainWindow");
-	MGlobal::executeCommand("setParent $gMainWindow");
-	MGlobal::executeCommand("menu -label \"MayaToCellVIEW\" mayaToCelViewMenu");
-
-	MGlobal::executeCommand("setParent -menu mayaToCelViewMenu");
-	MGlobal::executeCommand("menuItem -label \"Start Streaming\" -command \"startM2CVStreaming\" startStreamingItem");
-	MGlobal::executeCommand("menuItem -label \"End Streaming\" -command \"endM2CVStreaming\" -enable false endStreamingItem");
-
-	if (!status)
-	{
-		status.perror("Failed to register customLocator\n");
-		return status;
-	}
-
-	std::cout << "initializePlugin successful." << std::endl;
-
-	return status;
-}
-
-MStatus uninitializePlugin(MObject obj)
-{
-	MFnPlugin plugin(obj);
-
-	// TODO: delete custom menu
-	MStatus status = plugin.deregisterNode(CustomLocator::typeId);
-	status = plugin.deregisterCommand("startM2CVStreaming");
-	status = plugin.deregisterCommand("endM2CVStreaming");
-
-	MGlobal::executeCommand("global string $gMainWindow");
-	MGlobal::executeCommand("setParent $gMainWindow");
-	MGlobal::executeCommand("deleteUI \"mayaToCelViewMenu\""); // finally this works
-
-	if (!status)
-	{
-		status.perror("Failed to deregister customLocator\n");
-		return status;
-	}
-
-	std::cout << "uninitializePlugin successful." << std::endl;
-	return status;
-}
-
-// ------------------------------------------------------------------------------------- MAYA PLUGIN REQUIRED FUNCTIONS end
