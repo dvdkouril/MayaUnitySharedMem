@@ -22,7 +22,7 @@ MStatus initializePlugin(MObject obj)
 		CustomLocator::initialize,
 		MPxNode::kLocatorNode); // is this why it didn't work before????????? yep, looks like it
 
-								// register startStreamingCommand command
+	// register startStreamingCommand command
 	status = plugin.registerCommand("startM2CVStreaming", startStreamingCommand::creator);
 	status = plugin.registerCommand("endM2CVStreaming", endStreamingCommand::creator);
 	status = plugin.registerCommand("showM2CVWindow", showStreamingWindowCommand::creator);

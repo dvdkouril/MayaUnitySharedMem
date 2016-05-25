@@ -9,6 +9,8 @@
 #include <maya/MSelectionList.h>
 #include <maya/MDagPath.h>
 #include <maya/MFnCamera.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MQtUtil.h>
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -36,6 +38,17 @@ const MString CustomLocator::typeName("customLocator");
 */
 void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::DisplayStyle style, M3dView::DisplayStatus status)
 {
+	//QWidget* control = MQtUtil::findWindow("Form");
+	QWidget* control = MQtUtil::findControl("frameTimeLabel");
+	if (control != NULL)
+	{
+		std::cerr << "Streaming Window has been found" << std::endl;
+		//StreamingWindow *win = new StreamingWindow(control);
+		QLabel *label = qobject_cast<QLabel * >(control);
+		//label->setText("something");
+		label->setText(QString::number(this->lastFrameTime));
+	}
+
 	StartCounter();
 
 	std::vector<float> posMemOutArray; // array for positions (3 consecutive floats are single object's position)
@@ -149,15 +162,25 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 	// scene info
 	CopyMemory(pSceneInfo, &numberOfObjects, sizeof(int));
 
+	this->lastFrameTime = GetCounter();
+
 }
 
-
+/*
+	TODO: send current frame time to an output attribute
+*/
+MStatus	CustomLocator::compute(const MPlug& plug, MDataBlock& data)
+{
+	return MStatus::kSuccess;
+}
 
 CustomLocator::CustomLocator() : MPxLocatorNode()
 {
 	nextFreeInternalId = 0;
-	debugOut.open("C:\\Users\\dvdkouril\\Documents\\Visual Studio 2015\\Projects\\MayaUnitySharedMem\\output.txt");
+	//debugOut.open("C:\\Users\\dvdkouril\\Documents\\Visual Studio 2015\\Projects\\MayaUnitySharedMem\\output.txt");
 
+	//this->windowPtr = nullptr;
+	this->lastFrameTime = 0;
 
 	// iterating through the scene to see for how many objects do I need to allocate memory
 	// ... and also some other things
@@ -243,6 +266,13 @@ void * CustomLocator::creator()
 MStatus CustomLocator::initialize()
 {
 	std::cout << "CustomLocator::initialize" << std::endl;
+
+	/*MFnNumericAttribute nAttr;
+	a_outFrameTime = nAttr.create("output", "out", MFnNumericData::kFloat);
+	nAttr.setWritable(false);
+	nAttr.setStorable(false);
+	addAttribute(a_outFrameTime);*/
+
 	return MS::kSuccess;
 }
 
@@ -337,67 +367,6 @@ bool CustomLocator::initSharedMemory(size_t numberOfObjs)
 	}
 
 	return true;
-
-	//TCHAR sceneInfoShMemName[] = TEXT("MayaToUnitySceneInfoSharedMem");
-	//this->hSceneInfoShMem = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, BUF_SIZE, sceneInfoShMemName); // memory size if a bit bigger than needed...
-
-	//if (hSceneInfoShMem == NULL)
-	//{
-	//	std::cerr << "Could not create file mapping object \"MayaToUnitySceneInfoSharedMem\": " << (int)GetLastError() << std::endl;
-	//	return false;
-	//}
-
-	//this->pSceneInfo = MapViewOfFile(this->hSceneInfoShMem, FILE_MAP_ALL_ACCESS, 0, 0, 0); // If I understand the documentation correctly, there could be 0
-
-	//if (pSceneInfo == NULL)
-	//{
-	//	std::cerr << "Could not map view of file \"MayaToUnitySceneInfoSharedMem\": " << (int)GetLastError() << std::endl;
-	//	CloseHandle(hSceneInfoShMem);
-	//	return false;
-	//}
-
-	//// ------------------------------------------------------ camera info shared memory initialization
-	//TCHAR camShMemName[] = TEXT("MayaToUnityCameraInfoSharedMem");
-	//this->hCamInfoShMem = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, BUF_SIZE, camShMemName);
-
-	//if (hCamInfoShMem == NULL)
-	//{
-	//	std::cerr << "Could not create file mapping object \"MayaToUnityCameraInfoSharedMem\": " << (int)GetLastError() << std::endl;
-	//	return false;
-	//}
-
-	//this->pCamInfo = MapViewOfFile(this->hCamInfoShMem, FILE_MAP_ALL_ACCESS, 0, 0, BUF_SIZE); // If I understand the documentation correctly, there could be 0
-
-	//if (pCamInfo == NULL)
-	//{
-	//	std::cerr << "Could not map view of file \"MayaToUnityCameraInfoSharedMem\": " << (int)GetLastError() << std::endl;
-	//	CloseHandle(hCamInfoShMem);
-	//	return false;
-	//}
-
-	//// ------------------------------------------------------ main shared memory initialization
-	//TCHAR szName[] = TEXT("MyFileMappingObject");
-	////hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,	BUF_SIZE, szName);
-	//DWORD memorySize = (DWORD)numberOfObjs * sizeof(float) * 4 * 3; // number of objects * sizeof(float) * 4 coordinates each * 3 (positions, rotations and ids)
-	//hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, memorySize, szName);
-
-	//if (hMapFile == NULL)
-	//{
-	//	std::cerr << "Could not create file mapping object \"MyFileMappingObject\": " << (int)GetLastError() << std::endl;
-	//	return false;
-	//}
-
-	//this->pBuf = MapViewOfFile(this->hMapFile, FILE_MAP_ALL_ACCESS,	0, 0, BUF_SIZE); // If I understand the documentation correctly, there could be 0
-
-	//if (pBuf == NULL)
-	//{
-	//	std::cerr << "Could not map view of file \"MyFileMappingObject\": " << (int)GetLastError() << std::endl;
-	//	CloseHandle(hMapFile);
-	//	return false;
-	//}
-
-	//return true;
-	//return false; // testing purposes
 
 }
 
