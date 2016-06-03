@@ -1,51 +1,105 @@
-#include "CustomLocator.h"
-
+#include <vector>
+#include <algorithm>
+#include <sstream>
 #include <maya/MItDag.h>
 #include <maya/MFnDependencyNode.h>
+#include <maya/MDagPath.h>
 #include <maya/MFnTransform.h>
 #include <maya/MVector.h>
 #include <maya/MQuaternion.h>
-#include <maya/MEulerRotation.h>
-#include <maya/MSelectionList.h>
-#include <maya/MDagPath.h>
-#include <maya/MFnCamera.h>
-#include <maya/MFnNumericAttribute.h>
-#include <maya/MQtUtil.h>
-#include <string>
-#include <sstream>
-#include <iostream>
-#include <stdexcept>
-#include <vector>
-#include <algorithm>
-//#include <queue>
 
-#include "FixedSizeQueue.h"
 
-#define BUF_SIZE 256
+#include "Streamer.h"
 
-double PCFreq = 0.0;
-__int64 CounterStart = 0;
 
-//std::queue<double> *frameTimesQueue = new std::queue<double>();
-FixedSizeQueue frameTimesQueue(10); // TODO: this should probably be in the CustomLocator class
+Streamer::Streamer(void)
+{
+	state = StreamerState::Stopped; // Streaming is not started until doing so explicitly!
 
-// counter from http://stackoverflow.com/questions/1739259/how-to-use-queryperformancecounter
-// outputs number of ms
-void StartCounter();
-double GetCounter();
+}
 
-const MTypeId CustomLocator::typeId(0x70000);
-const MString CustomLocator::typeName("customLocator");
+Streamer::~Streamer(void)
+{
+	stop();
+}
 
 /*
-	Most important method of this class.
-	Parses the scene looking for protein objects and outputs their positions, rotations and information about type int shared memory for Unity to read.
-	Exploits MPxLocatorNode's draw method because it's the only class in Maya API (that I know of) that gets called everytime something changes in the viewport.
+	What happens when you start the streaming:
+	(1) you need to traverse the scene and figure out for how many objects to I need to allocate the shared memory
+	(2) build up the pdbIdMap
+	(3) init the memory
+	(4) copy the pdbIdMap info into shared memory
 */
-void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::DisplayStyle style, M3dView::DisplayStatus status)
+void Streamer::start()
 {
+	// (1)
+	int numberOfObjects = 0;
+	MItDag itTran = MItDag(MItDag::kDepthFirst, MFn::kTransform);
+	for (; !itTran.isDone(); itTran.next())
+	{
+		MObject obj = itTran.currentItem();
+		MFnDependencyNode nodeFn(obj);
+		MString nodeName = nodeFn.name();
 
-	StartCounter();
+		if (strstr(nodeName.asChar(), "pdbMolStruc_") != NULL)
+		{
+			numberOfObjects += 1;
+			// ... then extract what's after "pdbMolStruc_" and before another "_" (can be PDB id that is 4 chars but also something else
+			std::string fullName(nodeName.asChar());
+			std::string pdbString = fullName.substr(12, 4);
+			std::transform(pdbString.begin(), pdbString.end(), pdbString.begin(), ::tolower); // TODO: this might cause some problems in the future
+			// TODO: figure out if it's not there already
+			std::map<std::string, int>::iterator containsIt = pdbIdMap.find(pdbString);
+			if (containsIt == pdbIdMap.end()) 
+			{ // if this key is not in the map already...
+				pdbIdMap[pdbString] = nextFreeInternalId;
+				nextFreeInternalId += 1;
+			}
+		}
+	}
+
+	// (2)
+	std::stringstream ss;
+	for (std::map<std::string, int>::iterator it = pdbIdMap.begin(); it != pdbIdMap.end(); ++it)
+	{
+		ss << it->first << " " << it->second << std::endl;
+	}
+	std::string toOutputStr = ss.str();
+
+	// (3)
+	if (!initSharedMemory(numberOfObjects))
+	{ // if allocation of shared memory fails...
+		freeSharedMemory();
+		return;
+	}
+
+	// (4)
+	CopyMemory(this->pPdbMappingShMem, toOutputStr.c_str(), sizeof(char) * toOutputStr.length());
+
+	state = StreamerState::Running;
+}
+
+/*
+	This is not used yet really.
+*/
+void Streamer::pause()
+{
+	state = StreamerState::Paused;
+}
+
+void Streamer::stop()
+{
+	state = StreamerState::Stopped;
+
+	freeSharedMemory();
+}
+
+void Streamer::update(const MString& panelName, void* data)
+{
+	if (this->state != StreamerState::Running)
+	{
+		return;
+	}
 
 	std::vector<float> posMemOutArray; // array for positions (3 consecutive floats are single object's position)
 	std::vector<float> rotMemOutArray; // array for rotations (4 consecutive floats are single object's rotation)
@@ -125,10 +179,6 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 
 			numberOfObjects += 1;
 		}
-
-		//std::cerr << GetCounter() << std::endl;
-		//std::cout.flush();
-		//debugOut << GetCounter() << std::endl;
 	}
 
 	size_t posArraySize = posMemOutArray.size();
@@ -160,157 +210,25 @@ void CustomLocator::draw(M3dView & view, const MDagPath & path, M3dView::Display
 
 	//Sleep(2000);
 
-	this->lastFrameTime = GetCounter();
-	frameTimesQueue.push(lastFrameTime);
+	/*this->lastFrameTime = GetCounter();
+	frameTimesQueue.push(lastFrameTime);*/
 
-	QWidget* control = MQtUtil::findControl("frameTimeLabel");
-	if (control != NULL)
-	{
-		double frameTimesSum = frameTimesQueue.getSum();
-		int framesCount = frameTimesQueue.size();
+	//QWidget* control = MQtUtil::findControl("frameTimeLabel");
+	//if (control != NULL)
+	//{
+	//	double frameTimesSum = frameTimesQueue.getSum();
+	//	int framesCount = frameTimesQueue.size();
 
-		double averageFrameTime = frameTimesSum / framesCount;
+	//	double averageFrameTime = frameTimesSum / framesCount;
 
-		QLabel *label = qobject_cast<QLabel * >(control);
-		//label->setText(QString::number(this->lastFrameTime) + "asdfa");
-		label->setText(QString::number(averageFrameTime) + " ms (" + QString::number(1 / averageFrameTime) + " FPS)");
-	}
+	//	QLabel *label = qobject_cast<QLabel * >(control);
+	//	//label->setText(QString::number(this->lastFrameTime) + "asdfa");
+	//	label->setText(QString::number(averageFrameTime) + " ms (" + QString::number(1 / averageFrameTime) + " FPS)");
+	//}
 }
 
-/*
-	TODO: send current frame time to an output attribute
-*/
-MStatus	CustomLocator::compute(const MPlug& plug, MDataBlock& data)
+bool Streamer::initSharedMemory(size_t numberOfObjs)
 {
-	return MStatus::kSuccess;
-}
-
-CustomLocator::CustomLocator() : MPxLocatorNode()
-{
-	nextFreeInternalId = 0;
-
-	//this->windowPtr = nullptr;
-	this->lastFrameTime = 0;
-
-	// iterating through the scene to see for how many objects do I need to allocate memory
-	// ... and also some other things
-	// this is actually very similar to the iteration that I am doing in the "main" loop
-	int numberOfObjects = 0;
-	MItDag itTran = MItDag(MItDag::kDepthFirst, MFn::kTransform);
-	for (; !itTran.isDone(); itTran.next())
-	{
-		MObject obj = itTran.currentItem();
-		MFnDependencyNode nodeFn(obj);
-		MString nodeName = nodeFn.name();
-
-		if (strstr(nodeName.asChar(), "pdbMolStruc_") != NULL)
-		{
-			numberOfObjects += 1;
-			// ... then extract what's after "pdbMolStruc_" and before another "_" (can be PDB id that is 4 chars but also something else
-			std::string fullName(nodeName.asChar());
-			std::string pdbString = fullName.substr(12, 4);
-			std::transform(pdbString.begin(), pdbString.end(), pdbString.begin(), ::tolower); // TODO: this might cause some problems in the future
-			// TODO: figure out if it's not there already
-			std::map<std::string, int>::iterator containsIt = pdbIdMap.find(pdbString);
-			if (containsIt == pdbIdMap.end()) 
-			{ // if this key is not in the map already...
-				pdbIdMap[pdbString] = nextFreeInternalId;
-				nextFreeInternalId += 1;
-			}
-			
-		}
-	}
-
-	std::stringstream ss;
-	for (std::map<std::string, int>::iterator it = pdbIdMap.begin(); it != pdbIdMap.end(); ++it)
-	{
-		ss << it->first << " " << it->second << std::endl;
-	}
-	std::string toOutputStr = ss.str();
-
-	if (!initSharedMemory(numberOfObjects))
-	{ // if allocation of shared memory fails...
-		throw std::bad_alloc();
-	}
-
-	CopyMemory(this->pPdbMappingShMem, toOutputStr.c_str(), sizeof(char) * toOutputStr.length());
-}
-
-bool CustomLocator::isBounded() const
-{
-	return true; // by returning false I think this should make it to call the draw without culling it ever
-	//return true;
-}
-
-MBoundingBox CustomLocator::boundingBox() const
-{
-	MBoundingBox bbox;
-	// just some random bounding box
-	bbox.expand(MPoint(-0.5f, 0.0f, -0.5f));
-	bbox.expand(MPoint(0.5f, 0.0f, -0.5f));
-	bbox.expand(MPoint(0.5f, 0.0f, 0.5f));
-	bbox.expand(MPoint(-0.5f, 0.0f, 0.5f));
-	bbox.expand(MPoint(0.0f, -0.5f, 0.0f));
-	bbox.expand(MPoint(0.0f, 0.5f, 0.0f));
-	return bbox;
-}
-
-void * CustomLocator::creator()
-{
-	try
-	{
-		return new CustomLocator; // CustomLocator constructor might throw an exception if shared memory allocation fails...
-	} catch (const std::exception& error)
-	{
-		std::cerr << "Shared memory has not been properly allocated!" << std::endl;
-		(void)error; // just to make the warning go away
-		return nullptr;
-	}
-	//return new CustomLocator;
-	//return nullptr; // testing
-}
-
-/*
-	This function is called after loading of the plugin.
-*/
-MStatus CustomLocator::initialize()
-{
-	std::cout << "CustomLocator::initialize" << std::endl;
-
-	/*MFnNumericAttribute nAttr;
-	a_outFrameTime = nAttr.create("output", "out", MFnNumericData::kFloat);
-	nAttr.setWritable(false);
-	nAttr.setStorable(false);
-	addAttribute(a_outFrameTime);*/
-
-	return MS::kSuccess;
-}
-
-HANDLE CustomLocator::createSharedMemory(char * name, size_t size)
-{
-	HANDLE memoryHandle = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, size, name);
-	
-	return memoryHandle;
-}
-
-LPVOID CustomLocator::createMemoryMapping(HANDLE handle)
-{
-	return MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, 0);
-}
-
-// ==================================================== Shared Memory related functions
-/*
-	TODO: 
-			- figure out what size of memory to allocate (now it's BUF_SIZE for all of them)
-			DONE:
-			- Better error handling
-*/
-//bool CustomLocator::initSharedMemory() 
-bool CustomLocator::initSharedMemory(size_t numberOfObjs) 
-{
-	// ------------------------------------------------------ scene info shared memory initialization
-
-	// refactored:
 	this->hSceneInfoShMem = createSharedMemory("MayaToUnitySceneInfoSharedMem", BUF_SIZE);
 	this->hCamInfoShMem = createSharedMemory("MayaToUnityCameraInfoSharedMem", BUF_SIZE);
 	DWORD memorySize = (DWORD)numberOfObjs * sizeof(float) * 4 * 3; // number of objects * sizeof(float) * 4 coordinates each * 3 (positions, rotations and ids)
@@ -377,12 +295,22 @@ bool CustomLocator::initSharedMemory(size_t numberOfObjs)
 	}
 
 	return true;
-
 }
 
-void CustomLocator::freeSharedMemory()
+HANDLE Streamer::createSharedMemory(char* name, size_t size)
 {
-	std::cout << "freeSharedMemory()" << std::endl;
+	HANDLE memoryHandle = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, size, name);
+	
+	return memoryHandle;
+}
+
+LPVOID Streamer::createMemoryMapping(HANDLE handle)
+{
+	return MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, 0);
+}
+
+void Streamer::freeSharedMemory()
+{
 	UnmapViewOfFile(this->pBuf);
 	CloseHandle(this->hMapFile);
 
@@ -394,37 +322,4 @@ void CustomLocator::freeSharedMemory()
 
 	UnmapViewOfFile(this->pPdbMappingShMem);
 	CloseHandle(this->hPdbMappingShMem);
-}
-
-/*
-My utility function, probably shouldn't be here...
-*/
-MQuaternion CustomLocator::rotationMayaToUnity(MQuaternion q)
-{
-	MEulerRotation rotAng;
-	rotAng = q.asEulerRotation();
-	rotAng.x = -rotAng.x;
-	rotAng.y = -rotAng.y;
-	MEulerRotation reordered = rotAng.reorder(MEulerRotation::kZXY);
-	MQuaternion res = reordered.asQuaternion();
-
-	return res;
-}
-
-void StartCounter()
-{
-	LARGE_INTEGER li;
-	if (!QueryPerformanceFrequency(&li))
-		cout << "QueryPerformanceFrequency failed!\n";
-
-	PCFreq = double(li.QuadPart) / 1000.0;
-
-	QueryPerformanceCounter(&li);
-	CounterStart = li.QuadPart;
-}
-double GetCounter()
-{
-	LARGE_INTEGER li;
-	QueryPerformanceCounter(&li);
-	return double(li.QuadPart - CounterStart) / PCFreq;
 }

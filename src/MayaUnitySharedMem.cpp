@@ -1,16 +1,20 @@
 #include <maya/MGlobal.h>
 #include <maya/MFnPlugin.h>
+#include <maya/MUiMessage.h>
 
 #include "CustomLocator.h"
 
 #include "startStreamingCommand.h"
 #include "endStreamingCommand.h"
 #include "showStreamingWindowCommand.h"
+#include "Streamer.h"
 
-// ------------------------------------------------------------------------------------- 
-// MAYA PLUGIN REQUIRED FUNCTIONS
-// ------------------------------------------------------------------------------------- 
-// it might be better to move this somewhere else, but for now...
+static Streamer* streamer = nullptr;
+
+void simpleCallBackTest(const MString& panelName, void * data)
+{
+	streamer->update(panelName, data);
+}
 
 MStatus initializePlugin(MObject obj)
 {
@@ -26,6 +30,8 @@ MStatus initializePlugin(MObject obj)
 	status = plugin.registerCommand("startM2CVStreaming", startStreamingCommand::creator);
 	status = plugin.registerCommand("endM2CVStreaming", endStreamingCommand::creator);
 	status = plugin.registerCommand("showM2CVWindow", showStreamingWindowCommand::creator);
+
+	streamer = new Streamer;
 
 	// add a custom menu with items: Start streaming, Stop streaming
 	MGlobal::executeCommand("global string $gMainWindow");
@@ -45,8 +51,22 @@ MStatus initializePlugin(MObject obj)
 
 	std::cout << "initializePlugin successful." << std::endl;
 
+	MStatus status1;
+	M3dView viewport = M3dView::active3dView(&status1);
+	std::cerr << "viewport dims: " << viewport.portWidth() << ", " << viewport.portHeight() << std::endl;
+
+	// just testing the callbacks:
+	MStatus callBackStatus;
+	//MCallbackId callBackId = MUiMessage::add3dViewPostRenderMsgCallback(MString("persp"), &simpleCallBackTest, nullptr, &callBackStatus);
+	MCallbackId callBackId = MUiMessage::add3dViewPostRenderMsgCallback(MString("modelPanel4"), &simpleCallBackTest, nullptr, &callBackStatus);
+	if (callBackId == 0)
+	{
+		std::cerr << "Something's fucked up" << ", status: " << callBackStatus << std::endl;
+	}
+
 	return status;
 }
+
 
 MStatus uninitializePlugin(MObject obj)
 {
@@ -61,6 +81,8 @@ MStatus uninitializePlugin(MObject obj)
 	MGlobal::executeCommand("global string $gMainWindow");
 	MGlobal::executeCommand("setParent $gMainWindow");
 	MGlobal::executeCommand("deleteUI \"mayaToCelViewMenu\""); // finally this works
+
+	delete streamer;
 
 	if (!status)
 	{

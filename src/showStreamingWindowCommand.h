@@ -25,6 +25,7 @@ public:
 		QObject::connect(pluginWindow->ui->stopButton, SIGNAL(clicked(bool)), pluginWindow, SLOT(stopStreaming()));
 		pluginWindow->show();
 
+
 		// find custom locator object in the scene
 		MSelectionList list;
 		MDagPath pathToCustomLocator;
