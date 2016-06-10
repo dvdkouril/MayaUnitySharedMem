@@ -4,20 +4,16 @@
 
 #include "ProteinWatcherNode.h"
 
-#include "startStreamingCommand.h"
-#include "endStreamingCommand.h"
 #include "startStreaming.h"
+#include "stopStreaming.h"
 
 MStatus initializePlugin(MObject obj)
 {
 	MFnPlugin plugin(obj, "David Kouril", "1.0", "Any");
 
-	MStatus status = plugin.registerNode("proteinWatcherNode",
-		ProteinWatcherNode::id,
-		ProteinWatcherNode::creator,
-		ProteinWatcherNode::initialize);
-
+	MStatus status = plugin.registerNode("proteinWatcherNode", ProteinWatcherNode::id, ProteinWatcherNode::creator, ProteinWatcherNode::initialize);
 	status = plugin.registerCommand("startStreaming", startStreaming::creator);
+	status = plugin.registerCommand("stopStreaming", stopStreaming::creator);
 
 	// add a custom menu with items: Start streaming, Stop streaming
 	MGlobal::executeCommand("global string $gMainWindow");
@@ -25,7 +21,8 @@ MStatus initializePlugin(MObject obj)
 	MGlobal::executeCommand("menu -label \"MayaToCellVIEW\" mayaToCelViewMenu");
 
 	MGlobal::executeCommand("setParent -menu mayaToCelViewMenu");
-	MGlobal::executeCommand("menuItem -label \"startStreaming\" -command \"startStreaming\" startSTreamingItem");
+	MGlobal::executeCommand("menuItem -label \"startStreaming\" -command \"startStreaming\" startStreamingItem");
+	MGlobal::executeCommand("menuItem -label \"stopStreaming\" -command \"stopStreaming\" stopStreamingItem");
 
 	if (!status)
 	{
@@ -33,7 +30,7 @@ MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
-	std::cout << "initializePlugin successful." << std::endl;
+	std::cerr << "initializePlugin successful." << std::endl;
 
 	return status;
 }
@@ -46,6 +43,7 @@ MStatus uninitializePlugin(MObject obj)
 	// TODO: delete custom menu
 	MStatus status = plugin.deregisterNode(ProteinWatcherNode::id);
 	plugin.deregisterCommand("startStreaming");
+	plugin.deregisterCommand("stopStreaming");
 
 	MGlobal::executeCommand("global string $gMainWindow");
 	MGlobal::executeCommand("setParent $gMainWindow");
@@ -53,10 +51,10 @@ MStatus uninitializePlugin(MObject obj)
 
 	if (!status)
 	{
-		status.perror("Failed to deregister customLocator\n");
+		status.perror("Failed to deregister something\n");
 		return status;
 	}
 
-	std::cout << "uninitializePlugin successful." << std::endl;
+	std::cerr << "uninitializePlugin successful." << std::endl;
 	return status;
 }

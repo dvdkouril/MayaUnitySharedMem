@@ -1,6 +1,7 @@
 #include "ProteinWatcherNode.h"
 
 #include <maya/MNodeMessage.h>
+#include <maya/MFloatVector.h>
 #include <vector>
 
 MTypeId ProteinWatcherNode::id( 0x80028 );
@@ -25,7 +26,7 @@ void* ProteinWatcherNode::creator()
 
 MStatus ProteinWatcherNode::compute(const MPlug& plug, MDataBlock& data)
 {
-	std::cerr << "ProteinWatcherNode::compute" << std::endl;
+	//std::cerr << "ProteinWatcherNode::compute" << std::endl;
 
 	int pointer = data.inputValue(aSharedMemoryPointer).asInt();
 
@@ -36,6 +37,19 @@ MStatus ProteinWatcherNode::compute(const MPlug& plug, MDataBlock& data)
 
 	std::vector<float> position;
 	std::vector<float> rotation;
+
+	MFloatVector pos = data.inputValue(aPosition).asFloatVector();
+	position.push_back(pos.x);
+	position.push_back(pos.y);
+	position.push_back(pos.z);
+
+	rotation.push_back(0);
+	rotation.push_back(0);
+	rotation.push_back(0);
+	rotation.push_back(0);
+
+	std::cerr << "Writing: " << position[0] << ", " << position[1] << ", " << position[2] << std::endl;
+
 	writeToMemory(position, rotation, 0, pointer);
 
 	MDataHandle hOutput = data.outputValue(aIndexOutput);
@@ -79,10 +93,14 @@ MStatus ProteinWatcherNode::initialize()
 	aPosition = nAttr.createPoint("PositionInput", "posIn");
 	addAttribute(aPosition);
 
+	aSharedMemoryPointer = nAttr.create("SharedMemoryPointer", "shMemPtr", MFnNumericData::kInt);
+	addAttribute(aSharedMemoryPointer);
+
 	aIndexOutput = nAttr.create("IndexOutput", "indxOut", MFnNumericData::kInt);
 	addAttribute(aIndexOutput);
 
 	attributeAffects(aPosition, aIndexOutput);
+	// maybe attributeAffects also between memory pointer attribute and output .... but that's fine for now
 
 	return MStatus::kSuccess;
 } 
