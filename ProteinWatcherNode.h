@@ -28,6 +28,6 @@ private:
 	void						writeToMemory(std::vector<float> posMemOutArray, 
 											  std::vector<float> rotMemOutArray,
 											  int index,
-											  int handle);
+											  void* handle);
 };
 
