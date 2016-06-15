@@ -19,14 +19,17 @@ public:
 
 	static MObject				aSharedMemoryPointer;
 
+	// ------------------------ in
 	static MObject				aPosition;
-	// TODO: Rotation, but for now just try it with position
-
-	static MObject				aIndexOutput; // this is just so that I have some dependency (so that compute gets called)
+	//static MObject				aRotation; // TODO: might be a little trickier since I can't use .createPoint for this
+	static MObject				aIndex; // determines index of the Protein instance (and therefore where in the memory should the Watcher write it's changes
+	// ------------------------ out
+	static MObject				aDirtyOutput; // Dummy plug for forcing an evaluation of this mode
 
 private:
 	void						writeToMemory(std::vector<float> posMemOutArray, 
 											  std::vector<float> rotMemOutArray,
+											  std::vector<float> infMemOutArray,
 											  int index,
 											  void* handle);
 };
