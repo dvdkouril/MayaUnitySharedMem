@@ -3,15 +3,17 @@
 #include <maya/MUiMessage.h>
 
 #include "ProteinWatcherNode.h"
-
+#include "CameraWatcherNode.h"
 #include "startStreaming.h"
 #include "stopStreaming.h"
+
 
 MStatus initializePlugin(MObject obj)
 {
 	MFnPlugin plugin(obj, "David Kouril", "1.0", "Any");
 
 	MStatus status = plugin.registerNode("proteinWatcherNode", ProteinWatcherNode::id, ProteinWatcherNode::creator, ProteinWatcherNode::initialize);
+	status = plugin.registerNode("CameraWatcherNode", CameraWatcherNode::id, CameraWatcherNode::creator, CameraWatcherNode::initialize);
 	status = plugin.registerCommand("startStreaming", startStreaming::creator);
 	status = plugin.registerCommand("stopStreaming", stopStreaming::creator);
 

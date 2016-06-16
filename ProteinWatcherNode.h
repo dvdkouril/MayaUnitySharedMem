@@ -14,12 +14,11 @@ public:
 	virtual MStatus				compute(const MPlug& plug, MDataBlock& data) override;
 	static void*				creator();
 	static MStatus				initialize();
-
+	
 	static MTypeId				id;
 
-	static MObject				aSharedMemoryPointer;
-
 	// ------------------------ in
+	static MObject				aSharedMemoryPointer;
 	static MObject				aPosition;
 	//static MObject				aRotation; // TODO: might be a little trickier since I can't use .createPoint for this
 	static MObject				aIndex; // determines index of the Protein instance (and therefore where in the memory should the Watcher write it's changes
