@@ -8,9 +8,10 @@ MTypeId ProteinWatcherNode::id( 0x80028 );
 MObject ProteinWatcherNode::aSharedMemoryPointer;
 MObject ProteinWatcherNode::aPosition;
 MObject	ProteinWatcherNode::aIndex;
+MObject ProteinWatcherNode::aNumberOfObjects;
 MObject ProteinWatcherNode::aDirtyOutput;
 
-ProteinWatcherNode::ProteinWatcherNode(void)
+ProteinWatcherNode::ProteinWatcherNode(void) : MPxLocatorNode()
 {
 }
 
@@ -25,27 +26,37 @@ void* ProteinWatcherNode::creator()
 	return new ProteinWatcherNode();
 }
 
-MStatus ProteinWatcherNode::compute(const MPlug& plug, MDataBlock& data)
+void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::DisplayStyle style, M3dView::DisplayStatus status)
 {
-	std::cerr << "ProteinWatcherNode::compute (" << this->name() << ")" << std::endl;
+	std::cerr << "ProteinWatcherNode::draw (" << this->name() << ")" << std::endl;
 
-	void *pointer = data.inputValue(aSharedMemoryPointer).asAddr();
-	//MInt64 longPointer = data.inputValue(aSharedMemoryPointer).asInt64();
-	int index = data.inputValue(aIndex).asInt();
+	// get the data from position input attribute, I need to see if it's updated faster then how the compute method is called or if it's more or less the same
+	MObject thisNode = thisMObject();
+	MStatus stat;
 
-	if (pointer == 0) // in this case either pointer is not set yet or the streaming is stopped
-	{
-		return MStatus::kInvalidParameter;
-	}
+	MPlug posPlug(thisNode, aPosition);
+	MFloatPoint pos;
+	stat = posPlug.child(0).getValue(pos.x);
+	stat = posPlug.child(1).getValue(pos.y);
+	stat = posPlug.child(2).getValue(pos.z);
 
+	MPlug ptrPlug(thisNode, aSharedMemoryPointer);
+	MInt64 intPtr;
+	stat = ptrPlug.getValue(intPtr);
+	void * ptr = (void*)intPtr;
+
+	MPlug indexPlug(thisNode, aIndex);
+	int index;
+	stat = indexPlug.getValue(index);
+
+	// putting the data into intermediate containers
 	std::vector<float> position;
 	std::vector<float> rotation;
 	std::vector<float> info;
 
-	MFloatVector pos = data.inputValue(aPosition).asFloatVector();
 	position.push_back(pos.x);
 	position.push_back(pos.y);
-	position.push_back(-pos.z); // inverted for Unity
+	position.push_back(-pos.z);
 	position.push_back(0);
 
 	rotation.push_back(0);
@@ -58,16 +69,12 @@ MStatus ProteinWatcherNode::compute(const MPlug& plug, MDataBlock& data)
 	info.push_back(0);
 	info.push_back(0);
 
-	std::cerr << "Writing: " << position[0] << ", " << position[1] << ", " << position[2] << std::endl;
+	writeToMemory(position, rotation, info, index, ptr);
+}
 
-	writeToMemory(position, rotation, info, index, pointer);
-
-	MDataHandle hOutput = data.outputValue(aDirtyOutput);
-	hOutput.setInt(0); // hard coded for now, the class should have it's own id as a member attribute
-
-	data.setClean(plug);
-
-	return MStatus::kSuccess;
+bool ProteinWatcherNode::isBounded() const
+{
+	return false;
 }
 
 void ProteinWatcherNode::writeToMemory(std::vector<float> posMemOutArray, 
@@ -77,7 +84,11 @@ void ProteinWatcherNode::writeToMemory(std::vector<float> posMemOutArray,
 								       void* ptr)
 {
 	LPVOID pBuf = (LPVOID)ptr;
-	std::cerr << "ptr in writeToMemory(hex): " << std::hex << ptr << std::endl;
+	//std::cerr << "ptr in writeToMemory(hex): " << std::hex << ptr << std::endl;
+	std::cerr << "Writing into memory:" << std::endl;
+	std::cerr << posMemOutArray[0] << ", " << posMemOutArray[1] << ", " << posMemOutArray[2] << ", " << posMemOutArray[3] << std:: endl;
+	std::cerr << rotMemOutArray[0] << ", " << rotMemOutArray[1] << ", " << rotMemOutArray[2] << ", " << rotMemOutArray[3] << std:: endl;
+	std::cerr << infMemOutArray[0] << ", " << infMemOutArray[1] << ", " << infMemOutArray[2] << ", " << infMemOutArray[3] << std:: endl;
 
 	size_t posArraySize = posMemOutArray.size(); // this will always be 4
 	size_t rotArraySize = rotMemOutArray.size(); // this will always be 4
@@ -95,7 +106,7 @@ void ProteinWatcherNode::writeToMemory(std::vector<float> posMemOutArray,
 	// TODO: maybe I could do this in a single CopyMemory call by appending all the vectors together...would that be more efficient than 3 CopeMemory calls?
 
 	float * shMemPtr = (float*)pBuf; 
-	shMemPtr = shMemPtr + index * (posArraySize + rotArraySize);			// jumping to a memory location that corresponds with the index of proteinWatcher node
+	shMemPtr = shMemPtr + index * (posArraySize + rotArraySize + infArraySize);			// jumping to a memory location that corresponds with the index of proteinWatcher node
 	CopyMemory(shMemPtr, posMemOutPtr, posArraySize * sizeof(float));
 	shMemPtr = shMemPtr + posArraySize;										// changing the pointer location for rotation writing		
 	CopyMemory(shMemPtr, rotMemOutPtr, rotArraySize * sizeof(float));
@@ -113,6 +124,9 @@ MStatus ProteinWatcherNode::initialize()
 
 	aIndex = nAttr.create("IndexInput", "indxIn", MFnNumericData::kInt);
 	addAttribute(aIndex);
+
+	aNumberOfObjects = nAttr.create("NumberOfObjects", "objNmbr", MFnNumericData::kInt);
+	addAttribute(aNumberOfObjects);
 
 	//nAttr.setHidden(true);
 	aDirtyOutput = nAttr.create("DirtyOutput", "drtOut", MFnNumericData::kInt);

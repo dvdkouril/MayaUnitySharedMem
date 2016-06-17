@@ -3,6 +3,7 @@
 #include <maya/MPxCommand.h>
 #include <maya/MItDag.h>
 #include <maya/MFnDependencyNode.h>
+#include <maya/MFnDagNode.h>
 #include <maya/MDagModifier.h>
 #include <windows.h>
 #include <iomanip>
@@ -75,6 +76,12 @@ public:
 			}
 		}
 
+		MFnDependencyNode watcherFn = /*I need to get the current watcher node...here will be another iterator*/;
+		// TODO: I need to set another attribute numberOfObjects...
+		MObject objNumbrAttr = watcherFn.attribute(MString("NumberOfObjects"));
+		MPlug objNumbrPlug = watcherFn.findPlug(objNumbrAttr);
+		MStatus st = objNumbrPlug.setInt(numberOfObjects);
+
 		std::stringstream ss;
 		for (std::map<std::string, int>::iterator it = pdbIdMap.begin(); it != pdbIdMap.end(); ++it)
 		{
@@ -124,14 +131,28 @@ public:
 
 	static void plugProteinWatcher(MDGModifier& dgModifier, MFnDependencyNode& proteinFn, MObject parentProteinNode, void * pointer)
 	{
-		MObject newPW = dgModifier.createNode(ProteinWatcherNode::id);
-		MFnDependencyNode watcherFn(newPW);
+		//MObject newPW = dgModifier.createNode(ProteinWatcherNode::id);
+		MDagModifier dagModifier;
+		//MObject newPWTransform = dagModifier.createNode(ProteinWatcherNode::id);
+		MObject newPWTransform = dagModifier.createNode("proteinWatcherNode", MObject::kNullObj);
+		dagModifier.doIt();
+		MFnDagNode watcherTransFn(newPWTransform);
+		MStatus status;
+		unsigned childNum = watcherTransFn.childCount();
+		MObject newPW = watcherTransFn.child(0, &status);
+		if (status != MS::kSuccess)
+		{
+			std::cerr << status.errorString() << std::endl;
+			return;
+		}
+		MFnDagNode watcherFn(newPW);
 		watcherFn.setName(MString("ProteinWatcher") + nextFreeId);
 
 		// connecting it
 		MObject sourceAttr = proteinFn.attribute(MString("translate"));
 		MObject destAttr = watcherFn.attribute(MString("PositionInput"));
-		MStatus connectRes = dgModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
+		//MStatus connectRes = dgModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
+		MStatus connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
 		
 		if (connectRes != MS::kSuccess)
 		{
@@ -156,7 +177,8 @@ public:
 		indexPlug.setInt(nextFreeId);
 		
 		// commiting the changes
-		dgModifier.doIt();
+		//dgModifier.doIt();
+		dagModifier.doIt();
 		nextFreeId += 1;
 	}
 
