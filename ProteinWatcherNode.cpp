@@ -45,7 +45,7 @@ MStatus ProteinWatcherNode::compute(const MPlug& plug, MDataBlock& data)
 	MFloatVector pos = data.inputValue(aPosition).asFloatVector();
 	position.push_back(pos.x);
 	position.push_back(pos.y);
-	position.push_back(pos.z);
+	position.push_back(-pos.z); // inverted for Unity
 	position.push_back(0);
 
 	rotation.push_back(0);
