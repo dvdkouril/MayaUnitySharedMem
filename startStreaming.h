@@ -2,6 +2,7 @@
 
 #include <maya/MPxCommand.h>
 #include <maya/MItDag.h>
+#include <maya/MItDependencyNodes.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MDagModifier.h>
@@ -76,11 +77,45 @@ public:
 			}
 		}
 
-		MFnDependencyNode watcherFn = /*I need to get the current watcher node...here will be another iterator*/;
-		// TODO: I need to set another attribute numberOfObjects...
-		MObject objNumbrAttr = watcherFn.attribute(MString("NumberOfObjects"));
-		MPlug objNumbrPlug = watcherFn.findPlug(objNumbrAttr);
-		MStatus st = objNumbrPlug.setInt(numberOfObjects);
+		MItDependencyNodes depIt;
+		for (; !depIt.isDone(); depIt.next())
+		{
+			MObject node = depIt.item();
+			MFnDependencyNode fn(node);
+			MString name = fn.name();
+			if (strstr(name.asChar(), "ProteinWatcher") != NULL)
+			{
+				MObject objNumbrAttr = fn.attribute(MString("NumberOfObjects"));
+				MPlug objNumbrPlug = fn.findPlug(objNumbrAttr);
+				MStatus st = objNumbrPlug.setInt(numberOfObjects);
+			}
+		}
+
+		//// iterating once more and setting number of objects parameter
+		//MItDag it = MItDag(MItDag::kDepthFirst, MFn::kTransform);
+		//for (; !it.isDone(); it.next())
+		//{
+		//	MObject node = it.currentItem();
+		//	MFnDependencyNode fn(node);
+		//	MString name = fn.name();
+
+		//	//if (strstr(name.asChar(), "pdbMolStruc_") != NULL)
+		//	if (strstr(name.asChar(), "ProteinWatcher") != NULL)
+		//	{
+		//		MStatus status;
+		//		MFnDagNode dagFn(node);
+		//		unsigned childNum = dagFn.childCount();
+		//		MObject pw = dagFn.child(0, &status);
+		//		if (status != MS::kSuccess)
+		//		{
+		//			std::cerr << status.errorString() << std::endl;
+		//			return MS::kFailure;
+		//		}
+		//		MObject objNumbrAttr = fn.attribute(MString("NumberOfObjects"));
+		//		MPlug objNumbrPlug = fn.findPlug(objNumbrAttr);
+		//		MStatus st = objNumbrPlug.setInt(numberOfObjects);
+		//	}
+		//}
 
 		std::stringstream ss;
 		for (std::map<std::string, int>::iterator it = pdbIdMap.begin(); it != pdbIdMap.end(); ++it)

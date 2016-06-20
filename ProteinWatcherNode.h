@@ -35,6 +35,7 @@ private:
 											  std::vector<float> rotMemOutArray,
 											  std::vector<float> infMemOutArray,
 											  int index,
+											  int numberOfObjects,
 											  void* handle);
 };
 

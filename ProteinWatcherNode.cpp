@@ -49,6 +49,10 @@ void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::Disp
 	int index;
 	stat = indexPlug.getValue(index);
 
+	MPlug objNumPlug(thisNode, aNumberOfObjects);
+	int numberOfObjects;
+	stat = objNumPlug.getValue(numberOfObjects);
+
 	// putting the data into intermediate containers
 	std::vector<float> position;
 	std::vector<float> rotation;
@@ -69,7 +73,7 @@ void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::Disp
 	info.push_back(0);
 	info.push_back(0);
 
-	writeToMemory(position, rotation, info, index, ptr);
+	writeToMemory(position, rotation, info, index, numberOfObjects, ptr);
 }
 
 bool ProteinWatcherNode::isBounded() const
@@ -81,6 +85,7 @@ void ProteinWatcherNode::writeToMemory(std::vector<float> posMemOutArray,
 									   std::vector<float> rotMemOutArray, 
 									   std::vector<float> infMemOutArray, 
 									   int index,
+									   int numberOfObjects,
 								       void* ptr)
 {
 	LPVOID pBuf = (LPVOID)ptr;
@@ -103,15 +108,24 @@ void ProteinWatcherNode::writeToMemory(std::vector<float> posMemOutArray,
 	float * rotMemOutPtr = &rotMemOutArray[0]; // pointer arithmetics
 	float * infMemOutPtr = &infMemOutArray[0]; // pointer arithmetics
 
-	// TODO: maybe I could do this in a single CopyMemory call by appending all the vectors together...would that be more efficient than 3 CopeMemory calls?
+	//int numberOfObjects = 0; // TODO: !!!just for now, later this will be a parameter that will be set from outside!!!
 
-	float * shMemPtr = (float*)pBuf; 
-	shMemPtr = shMemPtr + index * (posArraySize + rotArraySize + infArraySize);			// jumping to a memory location that corresponds with the index of proteinWatcher node
-	CopyMemory(shMemPtr, posMemOutPtr, posArraySize * sizeof(float));
-	shMemPtr = shMemPtr + posArraySize;										// changing the pointer location for rotation writing		
-	CopyMemory(shMemPtr, rotMemOutPtr, rotArraySize * sizeof(float));
-	shMemPtr = shMemPtr + rotArraySize;
-	CopyMemory(shMemPtr, infMemOutPtr, infArraySize * sizeof(float));
+	float * posPtr = (float*)pBuf + index*(posArraySize);
+	CopyMemory(posPtr, posMemOutPtr, posArraySize * sizeof(float));
+
+	float *rotPtr = (float*)pBuf + numberOfObjects * posArraySize + index * rotArraySize;
+	CopyMemory(rotPtr, rotMemOutPtr, rotArraySize * sizeof(float));
+
+	float *infPtr = (float*)pBuf + numberOfObjects * (posArraySize * rotArraySize) + index * infArraySize;
+	CopyMemory(infPtr, infMemOutPtr, infArraySize * sizeof(float));
+
+	//float * shMemPtr = (float*)pBuf; 
+	//shMemPtr = shMemPtr + index * (posArraySize + rotArraySize + infArraySize);			// jumping to a memory location that corresponds with the index of proteinWatcher node
+	//CopyMemory(shMemPtr, posMemOutPtr, posArraySize * sizeof(float));
+	//shMemPtr = shMemPtr + posArraySize;										// changing the pointer location for rotation writing		
+	//CopyMemory(shMemPtr, rotMemOutPtr, rotArraySize * sizeof(float));
+	//shMemPtr = shMemPtr + rotArraySize;
+	//CopyMemory(shMemPtr, infMemOutPtr, infArraySize * sizeof(float));
 }
 
 MStatus ProteinWatcherNode::initialize()
