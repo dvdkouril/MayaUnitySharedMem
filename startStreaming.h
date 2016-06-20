@@ -77,6 +77,7 @@ public:
 			}
 		}
 
+		// set NumberOfObjects attribute on ProteinWatcher nodes
 		MItDependencyNodes depIt;
 		for (; !depIt.isDone(); depIt.next())
 		{
@@ -91,32 +92,7 @@ public:
 			}
 		}
 
-		//// iterating once more and setting number of objects parameter
-		//MItDag it = MItDag(MItDag::kDepthFirst, MFn::kTransform);
-		//for (; !it.isDone(); it.next())
-		//{
-		//	MObject node = it.currentItem();
-		//	MFnDependencyNode fn(node);
-		//	MString name = fn.name();
-
-		//	//if (strstr(name.asChar(), "pdbMolStruc_") != NULL)
-		//	if (strstr(name.asChar(), "ProteinWatcher") != NULL)
-		//	{
-		//		MStatus status;
-		//		MFnDagNode dagFn(node);
-		//		unsigned childNum = dagFn.childCount();
-		//		MObject pw = dagFn.child(0, &status);
-		//		if (status != MS::kSuccess)
-		//		{
-		//			std::cerr << status.errorString() << std::endl;
-		//			return MS::kFailure;
-		//		}
-		//		MObject objNumbrAttr = fn.attribute(MString("NumberOfObjects"));
-		//		MPlug objNumbrPlug = fn.findPlug(objNumbrAttr);
-		//		MStatus st = objNumbrPlug.setInt(numberOfObjects);
-		//	}
-		//}
-
+		// writing pdb mapping info into shared memory
 		std::stringstream ss;
 		for (std::map<std::string, int>::iterator it = pdbIdMap.begin(); it != pdbIdMap.end(); ++it)
 		{
@@ -127,6 +103,9 @@ public:
 		CopyMemory(pdbPointer, toOutputStr.c_str(), sizeof(char) * toOutputStr.length());
 		CopyMemory(scenePointer, &numberOfObjects, sizeof(int));
 
+
+		MGlobal::executeCommand("menuItem -edit -enable false startStreamingItem");
+		MGlobal::executeCommand("menuItem -edit -enable true stopStreamingItem");
 		return MS::kSuccess;
 	}
 
@@ -186,12 +165,33 @@ public:
 		// connecting it
 		MObject sourceAttr = proteinFn.attribute(MString("translate"));
 		MObject destAttr = watcherFn.attribute(MString("PositionInput"));
-		//MStatus connectRes = dgModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
 		MStatus connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
 		
 		if (connectRes != MS::kSuccess)
 		{
 			std::cerr << "Fail when connecting ProteinWatcher to Protein" << std::endl;
+		}
+
+		// Rotation connection
+		sourceAttr = proteinFn.attribute(MString("rotateQuaternionX"));
+		destAttr = watcherFn.attribute(MString("RotationX"));
+		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
+
+		sourceAttr = proteinFn.attribute(MString("rotateQuaternionY"));
+		destAttr = watcherFn.attribute(MString("RotationY"));
+		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
+
+		sourceAttr = proteinFn.attribute(MString("rotateQuaternionZ"));
+		destAttr = watcherFn.attribute(MString("RotationZ"));
+		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
+
+		sourceAttr = proteinFn.attribute(MString("rotateQuaternionW"));
+		destAttr = watcherFn.attribute(MString("RotationW"));
+		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
+
+		if (connectRes != MS::kSuccess)
+		{
+			std::cerr << "Fail when connecting on Rotation attribute" << std::endl;
 		}
 
 		// setting the pointer attribute

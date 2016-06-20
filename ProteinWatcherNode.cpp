@@ -1,12 +1,20 @@
 #include "ProteinWatcherNode.h"
 
 #include <maya/MFloatVector.h>
+#include <maya/MAngle.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MFnUnitAttribute.h>
+#include <maya/MFnCompoundAttribute.h>
 #include <vector>
 #include <iomanip>
 
 MTypeId ProteinWatcherNode::id( 0x80028 );
 MObject ProteinWatcherNode::aSharedMemoryPointer;
 MObject ProteinWatcherNode::aPosition;
+MObject ProteinWatcherNode::aRotationX;
+MObject ProteinWatcherNode::aRotationY;
+MObject ProteinWatcherNode::aRotationZ;
+MObject ProteinWatcherNode::aRotationW;
 MObject	ProteinWatcherNode::aIndex;
 MObject ProteinWatcherNode::aNumberOfObjects;
 MObject ProteinWatcherNode::aDirtyOutput;
@@ -40,6 +48,39 @@ void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::Disp
 	stat = posPlug.child(1).getValue(pos.y);
 	stat = posPlug.child(2).getValue(pos.z);
 
+	MPlug rotXPlug(thisNode, aRotationX);
+	MPlug rotYPlug(thisNode, aRotationY);
+	MPlug rotZPlug(thisNode, aRotationZ);
+	MPlug rotWPlug(thisNode, aRotationW);
+	float rotX;
+	MStatus st = rotXPlug.getValue(rotX);
+	if (st != MS::kSuccess)
+	{
+		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
+	}
+	float rotY;
+	st = rotXPlug.getValue(rotY);
+	if (st != MS::kSuccess)
+	{
+		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
+	}
+	float rotZ;
+	st = rotXPlug.getValue(rotZ);
+	if (st != MS::kSuccess)
+	{
+		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
+	}
+	float rotW;
+	st = rotXPlug.getValue(rotW);
+	if (st != MS::kSuccess)
+	{
+		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
+	}
+	/*float rotX = rotXPlug.asFloat();
+	float rotY = rotYPlug.asFloat();
+	float rotZ = rotZPlug.asFloat();
+	float rotW = rotWPlug.asFloat();*/
+
 	MPlug ptrPlug(thisNode, aSharedMemoryPointer);
 	MInt64 intPtr;
 	stat = ptrPlug.getValue(intPtr);
@@ -67,6 +108,10 @@ void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::Disp
 	rotation.push_back(0);
 	rotation.push_back(0);
 	rotation.push_back(0);
+	/*rotation.push_back(rotX);
+	rotation.push_back(rotY);
+	rotation.push_back(rotZ);
+	rotation.push_back(rotW);*/
 
 	info.push_back(0);
 	info.push_back(0);
@@ -119,13 +164,6 @@ void ProteinWatcherNode::writeToMemory(std::vector<float> posMemOutArray,
 	float *infPtr = (float*)pBuf + numberOfObjects * (posArraySize * rotArraySize) + index * infArraySize;
 	CopyMemory(infPtr, infMemOutPtr, infArraySize * sizeof(float));
 
-	//float * shMemPtr = (float*)pBuf; 
-	//shMemPtr = shMemPtr + index * (posArraySize + rotArraySize + infArraySize);			// jumping to a memory location that corresponds with the index of proteinWatcher node
-	//CopyMemory(shMemPtr, posMemOutPtr, posArraySize * sizeof(float));
-	//shMemPtr = shMemPtr + posArraySize;										// changing the pointer location for rotation writing		
-	//CopyMemory(shMemPtr, rotMemOutPtr, rotArraySize * sizeof(float));
-	//shMemPtr = shMemPtr + rotArraySize;
-	//CopyMemory(shMemPtr, infMemOutPtr, infArraySize * sizeof(float));
 }
 
 MStatus ProteinWatcherNode::initialize()
@@ -135,6 +173,24 @@ MStatus ProteinWatcherNode::initialize()
 	MFnNumericAttribute nAttr;
 	aPosition = nAttr.createPoint("PositionInput", "posIn");
 	addAttribute(aPosition);
+
+	aRotationX = nAttr.create("RotationX", "rotX", MFnNumericData::kFloat);
+	addAttribute(aRotationX);
+	aRotationY = nAttr.create("RotationY", "rotY", MFnNumericData::kFloat);
+	addAttribute(aRotationY);
+	aRotationZ = nAttr.create("RotationZ", "rotZ", MFnNumericData::kFloat);
+	addAttribute(aRotationZ);
+	aRotationW = nAttr.create("RotationW", "rotW", MFnNumericData::kFloat);
+	addAttribute(aRotationW);
+	//// THERE IS SOME PROBLEM HERE
+	//MFnUnitAttribute uAttr;
+	//aRotationX = uAttr.create("RotationX", "rotX", MFnUnitAttribute::kAngle);
+	//addAttribute(aRotationX);
+	//aRotationY = uAttr.create("RotationY", "rotY", MFnUnitAttribute::kAngle);
+	//addAttribute(aRotationY);
+	//aRotationZ = uAttr.create("RotationZ", "rotZ", MFnUnitAttribute::kAngle);
+	//addAttribute(aRotationZ);
+	//// ------------------------
 
 	aIndex = nAttr.create("IndexInput", "indxIn", MFnNumericData::kInt);
 	addAttribute(aIndex);

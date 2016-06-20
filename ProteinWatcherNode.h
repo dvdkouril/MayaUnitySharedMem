@@ -2,7 +2,6 @@
 
 //#include <maya/MPxNode.h>
 #include <maya/MPxLocatorNode.h>
-#include <maya/MFnNumericAttribute.h>
 #include <windows.h>
 #include <vector>
 
@@ -24,7 +23,10 @@ public:
 	// ------------------------ in
 	static MObject				aSharedMemoryPointer;
 	static MObject				aPosition;
-	//static MObject				aRotation; // TODO: might be a little trickier since I can't use .createPoint for this
+	static MObject				aRotationX;
+	static MObject				aRotationY;
+	static MObject				aRotationZ;
+	static MObject				aRotationW;
 	static MObject				aIndex; // determines index of the Protein instance (and therefore where in the memory should the Watcher write it's changes
 	static MObject				aNumberOfObjects;
 	// ------------------------ out

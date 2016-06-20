@@ -31,8 +31,13 @@ public:
 				//dgModifier.doIt();
 			}
 
+
 		}
 		dgModifier.doIt();
+
+		MGlobal::executeCommand("menuItem -edit -enable true startStreamingItem");
+		MGlobal::executeCommand("menuItem -edit -enable false stopStreamingItem");
+
 		MGlobal::executeCommand("flushUndo");
 
 		return MS::kSuccess;

@@ -23,8 +23,8 @@ MStatus initializePlugin(MObject obj)
 	MGlobal::executeCommand("menu -label \"MayaToCellVIEW\" mayaToCelViewMenu");
 
 	MGlobal::executeCommand("setParent -menu mayaToCelViewMenu");
-	MGlobal::executeCommand("menuItem -label \"startStreaming\" -command \"startStreaming\" startStreamingItem");
-	MGlobal::executeCommand("menuItem -label \"stopStreaming\" -command \"stopStreaming\" stopStreamingItem");
+	MGlobal::executeCommand("menuItem -label \"startStreaming\" -command \"startStreaming\" -enable true startStreamingItem");
+	MGlobal::executeCommand("menuItem -label \"stopStreaming\" -command \"stopStreaming\" -enable false stopStreamingItem");
 
 	if (!status)
 	{
