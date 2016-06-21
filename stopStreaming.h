@@ -6,6 +6,8 @@
 #include <maya/MGlobal.h>
 #include <maya/MItDependencyNodes.h>
 
+#include "global_variables.h"
+
 class stopStreaming : public MPxCommand
 {
 public:
@@ -24,13 +26,14 @@ public:
 			MFnDependencyNode fn(obj);
 			MString nodeName = fn.name();
 
-			if (strstr(nodeName.asChar(), "ProteinWatcher") != NULL)
+			if ( (strstr(nodeName.asChar(), "ProteinWatcher") != NULL) || (strstr(nodeName.asChar(), "CameraWatcher") != NULL))
 			{
-				//MDGModifier dgModifier; // yup this was fucking it up
+				MFnDagNode dagFn(obj);
+				int parentCount = dagFn.parentCount();
+				MObject parentTransform = dagFn.parent(0);
 				dgModifier.deleteNode(obj);
-				//dgModifier.doIt();
+				dgModifier.deleteNode(parentTransform);
 			}
-
 
 		}
 		dgModifier.doIt();
@@ -38,8 +41,22 @@ public:
 		MGlobal::executeCommand("menuItem -edit -enable true startStreamingItem");
 		MGlobal::executeCommand("menuItem -edit -enable false stopStreamingItem");
 
+		// release all the handles to shared memory objects
+		UnmapViewOfFile(pointer);
+		CloseHandle(mainMemoryHandle);
+
+		UnmapViewOfFile(camPointer);
+		CloseHandle(camHandle);
+
+		UnmapViewOfFile(pdbPointer);
+		CloseHandle(pdbHandle);
+
+		UnmapViewOfFile(scenePointer);
+		CloseHandle(sceneHandle);
+
 		MGlobal::executeCommand("flushUndo");
 
+		//std::cerr << "Streaming has been successfully stopped" << std::endl;
 		return MS::kSuccess;
 	}
 

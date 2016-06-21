@@ -13,7 +13,7 @@ MStatus initializePlugin(MObject obj)
 	MFnPlugin plugin(obj, "David Kouril", "1.0", "Any");
 
 	MStatus status = plugin.registerNode("proteinWatcherNode", ProteinWatcherNode::id, ProteinWatcherNode::creator, ProteinWatcherNode::initialize, MPxNode::kLocatorNode);
-	status = plugin.registerNode("CameraWatcherNode", CameraWatcherNode::id, CameraWatcherNode::creator, CameraWatcherNode::initialize);
+	status = plugin.registerNode("CameraWatcherNode", CameraWatcherNode::id, CameraWatcherNode::creator, CameraWatcherNode::initialize, MPxNode::kLocatorNode);
 	status = plugin.registerCommand("startStreaming", startStreaming::creator);
 	status = plugin.registerCommand("stopStreaming", stopStreaming::creator);
 

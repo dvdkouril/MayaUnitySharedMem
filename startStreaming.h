@@ -14,6 +14,7 @@
 #include <sstream>
 
 #include "ProteinWatcherNode.h"
+#include "global_variables.h"
 
 class startStreaming : public MPxCommand
 {
@@ -27,21 +28,41 @@ public:
 	{
 		std::cerr << "startStreaming::doIt" << std::endl;
 
+		// TODO: iterate the scene and count the number of object so that I can allocate appropriate amount of memory
+		int numberOfObjects = 0;
+
+		MItDag initialIt = MItDag(MItDag::kDepthFirst, MFn::kTransform);
+		for (; !initialIt.isDone(); initialIt.next())
+		{
+			MObject node = initialIt.currentItem();
+			
+			MFnDependencyNode fn(node);
+			MString nodeName = fn.name();
+
+			if (strstr(nodeName.asChar(), "pdbMolStruc_") != NULL)
+			{
+				numberOfObjects += 1;
+			}
+		}
+
 		// I could do a scene traversal once here so that I know how much memory should I allocate...but for now...
-		HANDLE handle			= createSharedMemory("PositionsRotationsMemory", 256);
-		LPVOID pointer			= createMemoryMapping(handle);
-		HANDLE camHandle		= createSharedMemory("MayaToUnityCameraInfoSharedMem", 256);
-		LPVOID camPointer		= createMemoryMapping(camHandle);
-		HANDLE pdbHandle		= createSharedMemory("MayaToUnityPdbMappingSharedMem", 256);
-		LPVOID pdbPointer		= createMemoryMapping(pdbHandle);
-		HANDLE sceneHandle		= createSharedMemory("MayaToUnitySceneInfoSharedMem", 256);
-		LPVOID scenePointer		= createMemoryMapping(sceneHandle);
+		DWORD memorySize = (DWORD)numberOfObjects * sizeof(float) * 4 * 3; // TODO: don't make it DWORD here but make it something big and calculate the two DWORDs inside the method
+		/*HANDLE handle			= createSharedMemory("PositionsRotationsMemory", memorySize);
+		LPVOID pointer			= createMemoryMapping(handle);*/
+		mainMemoryHandle		= createSharedMemory("PositionsRotationsMemory", memorySize);
+		pointer					= createMemoryMapping(mainMemoryHandle);
+		camHandle				= createSharedMemory("MayaToUnityCameraInfoSharedMem", 256);
+		camPointer				= createMemoryMapping(camHandle);
+		pdbHandle				= createSharedMemory("MayaToUnityPdbMappingSharedMem", 256);
+		pdbPointer				= createMemoryMapping(pdbHandle);
+		sceneHandle				= createSharedMemory("MayaToUnitySceneInfoSharedMem", 256);
+		scenePointer			= createMemoryMapping(sceneHandle);
 
 		std::cerr << "Pointer after MapViewOfFile: " << pointer << std::endl;
 
 		MDGModifier dgModifier;
 
-		int numberOfObjects = 0;
+		//int numberOfObjects = 0;
 		int nextFreeInternalId = 0;
 		std::map<std::string, int> pdbIdMap;
 
@@ -63,7 +84,7 @@ public:
 				plugProteinWatcher(dgModifier, proteinFn, parentProteinNode, pointer);
 
 				// building up the pdb mapping "database"
-				numberOfObjects += 1;
+				//numberOfObjects += 1; // I already did this
 				std::string fullName(nodeName.asChar());
 				std::string pdbString = fullName.substr(12, 4);
 				std::transform(pdbString.begin(), pdbString.end(), pdbString.begin(), ::tolower); // TODO: this might cause some problems in the future
@@ -116,20 +137,43 @@ public:
 
 	static void plugCameraWatcher(MDGModifier& dgModifier, MFnDependencyNode& proteinFn, MObject parentProteinNode, void * camPointer)
 	{
-		MObject newCW = dgModifier.createNode(CameraWatcherNode::id);
-		MFnDependencyNode watcherFn(newCW);
+		//MObject newCW = dgModifier.createNode(CameraWatcherNode::id);
+		MDagModifier dagModifier;
+		MObject newCWTransform = dagModifier.createNode("CameraWatcherNode", MObject::kNullObj);
+		dagModifier.doIt();
+		MFnDagNode watcherTransFn(newCWTransform);
+		MStatus status;
+		MObject newCW = watcherTransFn.child(0, &status);
+		if (status != MS::kSuccess)
+		{
+			std::cerr << status.errorString() << std::endl;
+			return;
+		}
+
+		MFnDagNode watcherFn(newCW);
+		//MFnDependencyNode watcherFn(newCW);
 		watcherFn.setName(MString("CameraWatcher"));
 
 		MObject sourceAttr = proteinFn.attribute(MString("translate"));
 		MObject destAttr = watcherFn.attribute(MString("PositionInput"));
-
-		MStatus connectRes = dgModifier.connect(parentProteinNode, sourceAttr, newCW, destAttr); // I could have a better name than parentProteinNode cause in this
+		MStatus connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newCW, destAttr); // I could have a better name than parentProteinNode cause in this
 																										 // case it's camera node
-
 		if (connectRes != MS::kSuccess)
 		{
 			std::cerr << "Fail when connecting CameraWatcher to a persp camera" << std::endl;
 		}
+
+		sourceAttr = proteinFn.attribute(MString("rotateX"));
+		destAttr = watcherFn.attribute(MString("RotationInputX"));
+		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newCW, destAttr);
+
+		sourceAttr = proteinFn.attribute(MString("rotateY"));
+		destAttr = watcherFn.attribute(MString("RotationInputY"));
+		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newCW, destAttr);
+
+		sourceAttr = proteinFn.attribute(MString("rotateZ"));
+		destAttr = watcherFn.attribute(MString("RotationInputZ"));
+		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newCW, destAttr);
 
 		MObject pointerAttr = watcherFn.attribute(MString("SharedMemoryPointer"));
 		MPlug pointerPlug = watcherFn.findPlug(pointerAttr);
@@ -140,7 +184,8 @@ public:
 		}
 
 		// commiting the changes
-		dgModifier.doIt();
+		dagModifier.doIt();
+		//dgModifier.doIt();
 	}
 
 	static void plugProteinWatcher(MDGModifier& dgModifier, MFnDependencyNode& proteinFn, MObject parentProteinNode, void * pointer)
@@ -152,7 +197,6 @@ public:
 		dagModifier.doIt();
 		MFnDagNode watcherTransFn(newPWTransform);
 		MStatus status;
-		unsigned childNum = watcherTransFn.childCount();
 		MObject newPW = watcherTransFn.child(0, &status);
 		if (status != MS::kSuccess)
 		{
@@ -173,21 +217,21 @@ public:
 		}
 
 		// Rotation connection
-		sourceAttr = proteinFn.attribute(MString("rotateQuaternionX"));
-		destAttr = watcherFn.attribute(MString("RotationX"));
+		sourceAttr = proteinFn.attribute(MString("rotateX"));
+		destAttr = watcherFn.attribute(MString("RotationInputX"));
 		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
 
-		sourceAttr = proteinFn.attribute(MString("rotateQuaternionY"));
-		destAttr = watcherFn.attribute(MString("RotationY"));
+		sourceAttr = proteinFn.attribute(MString("rotateY"));
+		destAttr = watcherFn.attribute(MString("RotationInputY"));
 		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
 
-		sourceAttr = proteinFn.attribute(MString("rotateQuaternionZ"));
-		destAttr = watcherFn.attribute(MString("RotationZ"));
+		sourceAttr = proteinFn.attribute(MString("rotateZ"));
+		destAttr = watcherFn.attribute(MString("RotationInputZ"));
 		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
 
-		sourceAttr = proteinFn.attribute(MString("rotateQuaternionW"));
-		destAttr = watcherFn.attribute(MString("RotationW"));
-		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);
+		/*sourceAttr = proteinFn.attribute(MString("rotateQuaternionW"));
+		destAttr = watcherFn.attribute(MString("RotationInputW"));
+		connectRes = dagModifier.connect(parentProteinNode, sourceAttr, newPW, destAttr);*/
 
 		if (connectRes != MS::kSuccess)
 		{

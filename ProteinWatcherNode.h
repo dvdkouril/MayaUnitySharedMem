@@ -26,7 +26,7 @@ public:
 	static MObject				aRotationX;
 	static MObject				aRotationY;
 	static MObject				aRotationZ;
-	static MObject				aRotationW;
+	//static MObject				aRotationW;
 	static MObject				aIndex; // determines index of the Protein instance (and therefore where in the memory should the Watcher write it's changes
 	static MObject				aNumberOfObjects;
 	// ------------------------ out

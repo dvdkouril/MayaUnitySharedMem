@@ -5,6 +5,8 @@
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnUnitAttribute.h>
 #include <maya/MFnCompoundAttribute.h>
+#include <maya/MEulerRotation.h>
+#include <maya/MQuaternion.h>
 #include <vector>
 #include <iomanip>
 
@@ -14,7 +16,7 @@ MObject ProteinWatcherNode::aPosition;
 MObject ProteinWatcherNode::aRotationX;
 MObject ProteinWatcherNode::aRotationY;
 MObject ProteinWatcherNode::aRotationZ;
-MObject ProteinWatcherNode::aRotationW;
+//MObject ProteinWatcherNode::aRotationW;
 MObject	ProteinWatcherNode::aIndex;
 MObject ProteinWatcherNode::aNumberOfObjects;
 MObject ProteinWatcherNode::aDirtyOutput;
@@ -51,7 +53,7 @@ void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::Disp
 	MPlug rotXPlug(thisNode, aRotationX);
 	MPlug rotYPlug(thisNode, aRotationY);
 	MPlug rotZPlug(thisNode, aRotationZ);
-	MPlug rotWPlug(thisNode, aRotationW);
+	//MPlug rotWPlug(thisNode, aRotationW);
 	float rotX;
 	MStatus st = rotXPlug.getValue(rotX);
 	if (st != MS::kSuccess)
@@ -59,23 +61,33 @@ void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::Disp
 		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
 	}
 	float rotY;
-	st = rotXPlug.getValue(rotY);
+	st = rotYPlug.getValue(rotY);
 	if (st != MS::kSuccess)
 	{
 		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
 	}
 	float rotZ;
-	st = rotXPlug.getValue(rotZ);
+	st = rotZPlug.getValue(rotZ);
 	if (st != MS::kSuccess)
 	{
 		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
 	}
-	float rotW;
-	st = rotXPlug.getValue(rotW);
+
+	MAngle rotationX(rotX, MAngle::kDegrees);
+	MAngle rotationY(rotY, MAngle::kDegrees);
+	MAngle rotationZ(rotZ, MAngle::kDegrees);
+
+	MEulerRotation eulRotation(rotationX.asRadians(), rotationY.asRadians(), rotationZ.asRadians());
+	MQuaternion quatRot = eulRotation.asQuaternion();
+
+	// There is a problem somewhere here
+	/*float rotW;
+	st = rotWPlug.getValue(rotW);
 	if (st != MS::kSuccess)
 	{
 		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
-	}
+	}*/
+	// -----------------------------------
 	/*float rotX = rotXPlug.asFloat();
 	float rotY = rotYPlug.asFloat();
 	float rotZ = rotZPlug.asFloat();
@@ -104,10 +116,14 @@ void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::Disp
 	position.push_back(-pos.z);
 	position.push_back(0);
 
+	rotation.push_back(quatRot.x);
+	rotation.push_back(quatRot.y);
+	rotation.push_back(quatRot.z);
+	rotation.push_back(quatRot.w);
+	/*rotation.push_back(0);
 	rotation.push_back(0);
 	rotation.push_back(0);
-	rotation.push_back(0);
-	rotation.push_back(0);
+	rotation.push_back(0);*/
 	/*rotation.push_back(rotX);
 	rotation.push_back(rotY);
 	rotation.push_back(rotZ);
@@ -161,7 +177,7 @@ void ProteinWatcherNode::writeToMemory(std::vector<float> posMemOutArray,
 	float *rotPtr = (float*)pBuf + numberOfObjects * posArraySize + index * rotArraySize;
 	CopyMemory(rotPtr, rotMemOutPtr, rotArraySize * sizeof(float));
 
-	float *infPtr = (float*)pBuf + numberOfObjects * (posArraySize * rotArraySize) + index * infArraySize;
+	float *infPtr = (float*)pBuf + numberOfObjects * (posArraySize + rotArraySize) + index * infArraySize;
 	CopyMemory(infPtr, infMemOutPtr, infArraySize * sizeof(float));
 
 }
@@ -174,14 +190,14 @@ MStatus ProteinWatcherNode::initialize()
 	aPosition = nAttr.createPoint("PositionInput", "posIn");
 	addAttribute(aPosition);
 
-	aRotationX = nAttr.create("RotationX", "rotX", MFnNumericData::kFloat);
+	aRotationX = nAttr.create("RotationInputX", "rotInX", MFnNumericData::kFloat);
 	addAttribute(aRotationX);
-	aRotationY = nAttr.create("RotationY", "rotY", MFnNumericData::kFloat);
+	aRotationY = nAttr.create("RotationInputY", "rotInY", MFnNumericData::kFloat);
 	addAttribute(aRotationY);
-	aRotationZ = nAttr.create("RotationZ", "rotZ", MFnNumericData::kFloat);
+	aRotationZ = nAttr.create("RotationInputZ", "rotInZ", MFnNumericData::kFloat);
 	addAttribute(aRotationZ);
-	aRotationW = nAttr.create("RotationW", "rotW", MFnNumericData::kFloat);
-	addAttribute(aRotationW);
+	//aRotationW = nAttr.create("RotationInputW", "rotInW", MFnNumericData::kFloat);
+	//addAttribute(aRotationW);
 	//// THERE IS SOME PROBLEM HERE
 	//MFnUnitAttribute uAttr;
 	//aRotationX = uAttr.create("RotationX", "rotX", MFnUnitAttribute::kAngle);
@@ -210,6 +226,10 @@ MStatus ProteinWatcherNode::initialize()
 	attributeAffects(aSharedMemoryPointer, aDirtyOutput);
 	attributeAffects(aPosition, aDirtyOutput);
 	attributeAffects(aIndex, aDirtyOutput);
+	attributeAffects(aRotationX, aDirtyOutput);
+	attributeAffects(aRotationY, aDirtyOutput);
+	attributeAffects(aRotationZ, aDirtyOutput);
+	//attributeAffects(aRotationW, aDirtyOutput);
 
 	return MStatus::kSuccess;
 } 

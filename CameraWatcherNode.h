@@ -1,15 +1,18 @@
 #pragma once
 
-#include <maya/MPxNode.h>
+#include <maya/MPxLocatorNode.h>
 #include <vector>
 
-class CameraWatcherNode : public MPxNode
+class CameraWatcherNode : public MPxLocatorNode
 {
 public:
 								CameraWatcherNode(void);
 	virtual						~CameraWatcherNode(void);
 
-	virtual MStatus				compute(const MPlug& plug, MDataBlock& data) override;
+	//virtual MStatus				compute(const MPlug& plug, MDataBlock& data) override;
+	virtual void				draw(M3dView & view, const MDagPath & path, M3dView::DisplayStyle style, M3dView::DisplayStatus status) override;
+	virtual bool				isBounded() const override;
+
 	static void*				creator();
 	static MStatus				initialize();
 
@@ -17,7 +20,9 @@ public:
 	// ------------------------- in
 	static MObject				aSharedMemoryPointer;
 	static MObject				aPosition;
-	//static MObject				aRotation;
+	static MObject				aRotationX;
+	static MObject				aRotationY;
+	static MObject				aRotationZ;
 	// ------------------------ out
 	static MObject				aDirtyOutput; // Dummy plug for forcing an evaluation of this mode
 

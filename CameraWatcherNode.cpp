@@ -3,10 +3,16 @@
 #include <windows.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFloatVector.h>
+#include <maya/MAngle.h>
+#include <maya/MQuaternion.h>
+#include <maya/MEulerRotation.h>
 
 MTypeId CameraWatcherNode::id( 0x80029 );
 MObject CameraWatcherNode::aSharedMemoryPointer;
 MObject CameraWatcherNode::aPosition;
+MObject CameraWatcherNode::aRotationX;
+MObject CameraWatcherNode::aRotationY;
+MObject CameraWatcherNode::aRotationZ;
 MObject CameraWatcherNode::aDirtyOutput;
 
 CameraWatcherNode::CameraWatcherNode(void)
@@ -19,42 +25,72 @@ CameraWatcherNode::~CameraWatcherNode()
 	
 }
 
-
-
-MStatus CameraWatcherNode::compute(const MPlug& plug, MDataBlock& data)
+void CameraWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::DisplayStyle style, M3dView::DisplayStatus status)
 {
-	std::cerr << "CameraWatcherNode::compute" << std::endl;
+	std::cerr << "ProteinWatcherNode::draw (" << this->name() << ")" << std::endl;
 
-	void *pointer = data.inputValue(aSharedMemoryPointer).asAddr();
+	// get the data from position input attribute, I need to see if it's updated faster then how the compute method is called or if it's more or less the same
+	MObject thisNode = thisMObject();
+	MStatus stat;
 
-	if (pointer == 0) // in this case either pointer is not set yet or the streaming is stopped
+	MPlug posPlug(thisNode, aPosition);
+	MFloatPoint pos;
+	stat = posPlug.child(0).getValue(pos.x);
+	stat = posPlug.child(1).getValue(pos.y);
+	stat = posPlug.child(2).getValue(pos.z);
+
+	MPlug rotXPlug(thisNode, aRotationX);
+	MPlug rotYPlug(thisNode, aRotationY);
+	MPlug rotZPlug(thisNode, aRotationZ);
+	//MPlug rotWPlug(thisNode, aRotationW);
+	float rotX;
+	MStatus st = rotXPlug.getValue(rotX);
+	if (st != MS::kSuccess)
 	{
-		return MStatus::kInvalidParameter;
+		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
 	}
+	float rotY;
+	st = rotYPlug.getValue(rotY);
+	if (st != MS::kSuccess)
+	{
+		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
+	}
+	float rotZ;
+	st = rotZPlug.getValue(rotZ);
+	if (st != MS::kSuccess)
+	{
+		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
+	}
+
+	MAngle rotationX(rotX, MAngle::kDegrees);
+	MAngle rotationY(rotY, MAngle::kDegrees);
+	MAngle rotationZ(rotZ, MAngle::kDegrees);
+
+	MEulerRotation eulRotation(rotationX.asRadians(), rotationY.asRadians(), rotationZ.asRadians());
+	MQuaternion quatRot = eulRotation.asQuaternion();
+
+	MPlug ptrPlug(thisNode, aSharedMemoryPointer);
+	MInt64 intPtr;
+	stat = ptrPlug.getValue(intPtr);
+	void * ptr = (void*)intPtr;
 
 	std::vector<float> position;
 	std::vector<float> rotation;
+	std::vector<float> info;
 
-	MFloatVector pos = data.inputValue(aPosition).asFloatVector();
 	position.push_back(pos.x);
 	position.push_back(pos.y);
 	position.push_back(pos.z);
-	position.push_back(0);
 
-	rotation.push_back(0);
-	rotation.push_back(0);
-	rotation.push_back(0);
-	rotation.push_back(0);
+	rotation.push_back(quatRot.x);
+	rotation.push_back(quatRot.y);
+	rotation.push_back(quatRot.z);
+	rotation.push_back(quatRot.w);
 
-	writeToMemory(position, rotation, pointer);
+	writeToMemory(position, rotation, ptr);
 
-	MDataHandle hOutput = data.outputValue(aDirtyOutput);
-	hOutput.setInt(0);
-
-	data.setClean(plug);
-
-	return MStatus::kSuccess;
 }
+
 
 void CameraWatcherNode::writeToMemory(std::vector<float> posMemOutArray, 
 									   std::vector<float> rotMemOutArray, 
@@ -89,12 +125,24 @@ void* CameraWatcherNode::creator()
 	return new CameraWatcherNode;
 }
 
+bool CameraWatcherNode::isBounded() const
+{
+	return false;
+}
+
 MStatus CameraWatcherNode::initialize()
 {
 	MFnNumericAttribute nAttr;
 
 	aPosition = nAttr.createPoint("PositionInput", "posIn");
 	addAttribute(aPosition);
+
+	aRotationX = nAttr.create("RotationInputX", "rotInX", MFnNumericData::kFloat);
+	addAttribute(aRotationX);
+	aRotationY = nAttr.create("RotationInputY", "rotInY", MFnNumericData::kFloat);
+	addAttribute(aRotationY);
+	aRotationZ = nAttr.create("RotationInputZ", "rotInZ", MFnNumericData::kFloat);
+	addAttribute(aRotationZ);
 
 	aSharedMemoryPointer = nAttr.create("SharedMemoryPointer", "shMemPtr", MFnNumericData::kInt64);
 	addAttribute(aSharedMemoryPointer);
@@ -104,6 +152,9 @@ MStatus CameraWatcherNode::initialize()
 
 	attributeAffects(aPosition, aDirtyOutput);
 	attributeAffects(aSharedMemoryPointer, aDirtyOutput);
+	attributeAffects(aRotationX, aDirtyOutput);
+	attributeAffects(aRotationY, aDirtyOutput);
+	attributeAffects(aRotationZ, aDirtyOutput);
 
 	return MS::kSuccess;
 }
