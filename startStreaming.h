@@ -27,6 +27,7 @@ public:
 	virtual MStatus doIt(const MArgList&) 
 	{
 		std::cerr << "startStreaming::doIt" << std::endl;
+		nextFreeId = 0;
 
 		// TODO: iterate the scene and count the number of object so that I can allocate appropriate amount of memory
 		int numberOfObjects = 0;

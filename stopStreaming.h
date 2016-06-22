@@ -56,7 +56,7 @@ public:
 
 		MGlobal::executeCommand("flushUndo");
 
-		//std::cerr << "Streaming has been successfully stopped" << std::endl;
+		std::cerr << "Streaming has been successfully stopped" << std::endl;
 		return MS::kSuccess;
 	}
 
