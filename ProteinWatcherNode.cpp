@@ -9,6 +9,7 @@
 #include <maya/MQuaternion.h>
 #include <vector>
 #include <iomanip>
+#include <limits>
 
 MTypeId ProteinWatcherNode::id( 0x80028 );
 MObject ProteinWatcherNode::aSharedMemoryPointer;
@@ -23,6 +24,9 @@ MObject ProteinWatcherNode::aDirtyOutput;
 
 ProteinWatcherNode::ProteinWatcherNode(void) : MPxLocatorNode()
 {
+	// just to be sure...
+	lastPosition.clear();
+	lastRotation.clear();
 }
 
 
@@ -80,32 +84,6 @@ void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::Disp
 	MEulerRotation eulRotation(rotationX.asRadians(), rotationY.asRadians(), rotationZ.asRadians());
 	MQuaternion quatRot = eulRotation.asQuaternion();
 
-	// There is a problem somewhere here
-	/*float rotW;
-	st = rotWPlug.getValue(rotW);
-	if (st != MS::kSuccess)
-	{
-		std::cerr << "CANNOT GET PLUG VALUE!" << std::endl;
-	}*/
-	// -----------------------------------
-	/*float rotX = rotXPlug.asFloat();
-	float rotY = rotYPlug.asFloat();
-	float rotZ = rotZPlug.asFloat();
-	float rotW = rotWPlug.asFloat();*/
-
-	MPlug ptrPlug(thisNode, aSharedMemoryPointer);
-	MInt64 intPtr;
-	stat = ptrPlug.getValue(intPtr);
-	void * ptr = (void*)intPtr;
-
-	MPlug indexPlug(thisNode, aIndex);
-	int index;
-	stat = indexPlug.getValue(index);
-
-	MPlug objNumPlug(thisNode, aNumberOfObjects);
-	int numberOfObjects;
-	stat = objNumPlug.getValue(numberOfObjects);
-
 	// putting the data into intermediate containers
 	std::vector<float> position;
 	std::vector<float> rotation;
@@ -120,19 +98,36 @@ void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::Disp
 	rotation.push_back(quatRot.y);
 	rotation.push_back(quatRot.z);
 	rotation.push_back(quatRot.w);
-	/*rotation.push_back(0);
-	rotation.push_back(0);
-	rotation.push_back(0);
-	rotation.push_back(0);*/
-	/*rotation.push_back(rotX);
-	rotation.push_back(rotY);
-	rotation.push_back(rotZ);
-	rotation.push_back(rotW);*/
 
 	info.push_back(0);
 	info.push_back(0);
 	info.push_back(0);
 	info.push_back(0);
+
+	// Check if the position and rotation is the same as the last time that this data has been written
+	if (dataChanged(position, rotation) == true)
+	{
+		cacheData(position, rotation);
+	} else
+	{
+		return;
+	}
+
+
+
+	MPlug ptrPlug(thisNode, aSharedMemoryPointer);
+	MInt64 intPtr;
+	stat = ptrPlug.getValue(intPtr);
+	void * ptr = (void*)intPtr;
+
+	MPlug indexPlug(thisNode, aIndex);
+	int index;
+	stat = indexPlug.getValue(index);
+
+	MPlug objNumPlug(thisNode, aNumberOfObjects);
+	int numberOfObjects;
+	stat = objNumPlug.getValue(numberOfObjects);
+
 
 	writeToMemory(position, rotation, info, index, numberOfObjects, ptr);
 }
@@ -180,6 +175,46 @@ void ProteinWatcherNode::writeToMemory(std::vector<float> posMemOutArray,
 	float *infPtr = (float*)pBuf + numberOfObjects * (posArraySize + rotArraySize) + index * infArraySize;
 	CopyMemory(infPtr, infMemOutPtr, infArraySize * sizeof(float));
 
+}
+
+bool ProteinWatcherNode::dataChanged(std::vector<float> pos, std::vector<float> rot)
+{
+	if (this->lastPosition.size() != 4 || this->lastRotation.size() != 4) // first pass when there is no data in last pass vectors
+	{
+		return true;
+	}
+
+	bool changed = false;
+
+	for (int i = 0; i < 4; i++)
+	{
+		float posValNew = pos.at(i);
+		float posValOld = this->lastPosition.at(i);
+		float rotValNew = rot.at(i);
+		float rotValOld = this->lastRotation.at(i);
+
+		float eps = std::numeric_limits<float>::epsilon();
+
+		if ( fabs(posValNew - posValOld) > eps )
+		{
+			changed = true;
+			return changed;
+		}
+
+		if ( fabs(rotValNew - rotValOld) > eps )
+		{
+			changed = true;
+			return changed;
+		}
+	}
+
+	return changed;
+}
+
+void ProteinWatcherNode::cacheData(std::vector<float> pos, std::vector<float> rot)
+{
+	this->lastPosition = pos;
+	this->lastRotation = rot;
 }
 
 MStatus ProteinWatcherNode::initialize()

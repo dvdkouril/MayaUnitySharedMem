@@ -39,5 +39,11 @@ private:
 											  int index,
 											  int numberOfObjects,
 											  void* handle);
+
+	bool						dataChanged(std::vector<float> pos, std::vector<float> rot);
+	void						cacheData(std::vector<float> pos, std::vector<float> rot);
+
+	std::vector<float>			lastPosition;
+	std::vector<float>			lastRotation;
 };
 
