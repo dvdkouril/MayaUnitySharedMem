@@ -181,7 +181,7 @@ public:
 		MStatus st = pointerPlug.setInt64((MInt64)camPointer);
 		if (st != MS::kSuccess)
 		{
-			std::cerr << "setting pointer for Camera Watcher fucked up" << std::endl;
+			std::cerr << "setting pointer for Camera Watcher has failed" << std::endl;
 		}
 
 		// commiting the changes
@@ -247,10 +247,8 @@ public:
 		MStatus st = pointerPlug.setInt64((MInt64)pointer);
 		if (st != MS::kSuccess)
 		{
-			std::cerr << ".setInt64 fucked up" << std::endl;
+			std::cerr << ".setInt64 failed" << std::endl;
 		}
-		//pointerPlug.setInt((int)pointer); // This is freaking hacky and if this works I will be ashamed (but happy at the same time)
-		//std::cerr << "pointer: " << pointer << std::endl;
 		
 		MObject indexAttr = watcherFn.attribute(MString("IndexInput"));
 		MPlug indexPlug = watcherFn.findPlug(indexAttr);
