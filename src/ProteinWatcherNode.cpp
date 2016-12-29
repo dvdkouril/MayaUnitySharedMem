@@ -20,6 +20,7 @@ MObject ProteinWatcherNode::aRotationZ;
 //MObject ProteinWatcherNode::aRotationW;
 MObject	ProteinWatcherNode::aIndex;
 MObject ProteinWatcherNode::aNumberOfObjects;
+MObject ProteinWatcherNode::aInternalTypeId;
 MObject ProteinWatcherNode::aDirtyOutput;
 
 ProteinWatcherNode::ProteinWatcherNode(void) : MPxLocatorNode()
@@ -84,6 +85,11 @@ void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::Disp
 	MEulerRotation eulRotation(rotationX.asRadians(), rotationY.asRadians(), rotationZ.asRadians());
 	MQuaternion quatRot = eulRotation.asQuaternion();
 
+	// internal type id
+	MPlug idPlug(thisNode, aInternalTypeId);
+	int internalId;
+	stat = idPlug.getValue(internalId);
+
 	// putting the data into intermediate containers
 	std::vector<float> position;
 	std::vector<float> rotation;
@@ -99,7 +105,8 @@ void ProteinWatcherNode::draw(M3dView& view, const MDagPath& path, M3dView::Disp
 	rotation.push_back(quatRot.z);
 	rotation.push_back(quatRot.w);
 
-	info.push_back(0);
+	//info.push_back(0);
+	info.push_back(internalId);
 	info.push_back(0);
 	info.push_back(0);
 	info.push_back(0);
@@ -245,6 +252,9 @@ MStatus ProteinWatcherNode::initialize()
 
 	aIndex = nAttr.create("IndexInput", "indxIn", MFnNumericData::kInt);
 	addAttribute(aIndex);
+
+	aInternalTypeId = nAttr.create("InternalTypeId", "typeId", MFnNumericData::kInt);
+	addAttribute(aInternalTypeId);
 
 	aNumberOfObjects = nAttr.create("NumberOfObjects", "objNmbr", MFnNumericData::kInt);
 	addAttribute(aNumberOfObjects);

@@ -82,7 +82,6 @@ public:
 
 			if (strstr(nodeName.asChar(), "pdbMolStruc_") != NULL)
 			{
-				plugProteinWatcher(dgModifier, proteinFn, parentProteinNode, pointer);
 
 				// building up the pdb mapping "database"
 				//numberOfObjects += 1; // I already did this
@@ -96,6 +95,9 @@ public:
 					pdbIdMap[pdbString] = nextFreeInternalId;
 					nextFreeInternalId += 1;
 				}
+
+				int internalTypeId = pdbIdMap[pdbString];
+				plugProteinWatcher(dgModifier, proteinFn, parentProteinNode, pointer, internalTypeId);
 			}
 		}
 
@@ -189,7 +191,7 @@ public:
 		//dgModifier.doIt();
 	}
 
-	static void plugProteinWatcher(MDGModifier& dgModifier, MFnDependencyNode& proteinFn, MObject parentProteinNode, void * pointer)
+	static void plugProteinWatcher(MDGModifier& dgModifier, MFnDependencyNode& proteinFn, MObject parentProteinNode, void * pointer, int internalTypeId)
 	{
 		//MObject newPW = dgModifier.createNode(ProteinWatcherNode::id);
 		MDagModifier dagModifier;
@@ -253,6 +255,10 @@ public:
 		MObject indexAttr = watcherFn.attribute(MString("IndexInput"));
 		MPlug indexPlug = watcherFn.findPlug(indexAttr);
 		indexPlug.setInt(nextFreeId);
+
+		MObject typeIdAttr = watcherFn.attribute(MString("InternalTypeId"));
+		MPlug typeIdPlug = watcherFn.findPlug(typeIdAttr);
+		typeIdPlug.setInt(internalTypeId); // internalTypeId is a method parameter
 		
 		// commiting the changes
 		//dgModifier.doIt();

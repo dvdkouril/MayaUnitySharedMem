@@ -29,6 +29,7 @@ public:
 	//static MObject				aRotationW;
 	static MObject				aIndex; // determines index of the Protein instance (and therefore where in the memory should the Watcher write it's changes
 	static MObject				aNumberOfObjects;
+	static MObject				aInternalTypeId; // type id which identifies what type of protein this instance is
 	// ------------------------ out
 	static MObject				aDirtyOutput; // Dummy plug for forcing an evaluation of this mode
 
